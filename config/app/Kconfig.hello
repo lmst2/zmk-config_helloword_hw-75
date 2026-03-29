@@ -1,0 +1,89 @@
+# Copyright (c) 2022-2023 XiNGRZ
+# SPDX-License-Identifier: MIT
+
+config HW75_EXTENDED_RGB
+	bool "HelloWord-style per-key RGB effects (replaces stock ZMK RGB)"
+	default n
+	depends on DT_HAS_CHOSEN(zmk_underglow)
+	select LED_STRIP
+	select WS2812_STRIP
+	select SPI
+	help
+	  Disables CONFIG_ZMK_RGB_UNDERGLOW and links extended effects + rgb_ug behavior from this module.
+
+if HW75_EXTENDED_RGB
+
+# Mirror ZMK underglow Kconfig symbols (they are inside ZMK's if ZMK_RGB_UNDERGLOW and are absent when it is off).
+
+config ZMK_RGB_UNDERGLOW_BRT_MIN
+	int "RGB minimum brightness in percent"
+	range 0 100
+	default 0
+
+config ZMK_RGB_UNDERGLOW_BRT_MAX
+	int "RGB maximum brightness in percent"
+	range ZMK_RGB_UNDERGLOW_BRT_MIN 100
+	default 100
+
+config ZMK_RGB_UNDERGLOW_HUE_STEP
+	int "RGB hue step in degrees"
+	range 0 359
+	default 10
+
+config ZMK_RGB_UNDERGLOW_SAT_STEP
+	int "RGB saturation step in percent"
+	range 0 100
+	default 10
+
+config ZMK_RGB_UNDERGLOW_BRT_STEP
+	int "RGB brightness step in percent"
+	range 0 100
+	default 10
+
+config ZMK_RGB_UNDERGLOW_HUE_START
+	int "RGB start hue in degrees"
+	range 0 359
+	default 0
+
+config ZMK_RGB_UNDERGLOW_SAT_START
+	int "RGB start saturation in percent"
+	range 0 100
+	default 100
+
+config ZMK_RGB_UNDERGLOW_BRT_START
+	int "RGB start brightness in percent"
+	range ZMK_RGB_UNDERGLOW_BRT_MIN ZMK_RGB_UNDERGLOW_BRT_MAX
+	default ZMK_RGB_UNDERGLOW_BRT_MAX
+
+config ZMK_RGB_UNDERGLOW_SPD_START
+	int "RGB start animation speed"
+	range 1 5
+	default 3
+
+config ZMK_RGB_UNDERGLOW_EFF_START
+	int "RGB start effect (0-8, see usb_comm.proto RgbState.Effect)"
+	range 0 8
+	default 0
+
+config ZMK_RGB_UNDERGLOW_ON_START
+	bool "RGB starts on by default"
+	default y
+
+config ZMK_RGB_UNDERGLOW_AUTO_OFF_IDLE
+	bool "Turn off RGB when keyboard is idle"
+	default n
+
+config ZMK_RGB_UNDERGLOW_AUTO_OFF_USB
+	bool "Turn off RGB when USB disconnected"
+	depends on USB_DEVICE_STACK
+	default n
+
+endif # HW75_EXTENDED_RGB
+
+config HW75_TOUCHBAR
+	bool "HelloWord TouchBar gestures (pan / app switch / virtual desktop)"
+	default n
+	depends on HW75_HID_MOUSE
+	help
+	  Uses key positions 82-87 as touch strip; set those keymap slots to &none on the base layer.
+	  Hold FN and tap Right Ctrl to cycle mode.
