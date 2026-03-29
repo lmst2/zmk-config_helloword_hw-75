@@ -77,16 +77,32 @@ static bool handle_version(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *
 
 #ifdef CONFIG_HW75_USB_COMM_FEATURE_EINK
 	res->features.has_eink = res->features.eink = true;
-#endif // CONFIG_HW75_USB_COMM_FEATURE_EINK
+#else
+	/* ZMKX treats omitted optional bools as "show tab" on some builds */
+	res->features.has_eink = true;
+	res->features.eink = false;
+#endif
 
 #ifdef CONFIG_HW75_USB_COMM_FEATURE_KNOB
 	res->features.has_knob = res->features.knob = true;
 	res->features.has_knob_prefs = res->features.knob_prefs = true;
 #if DT_HAS_COMPAT_STATUS_OKAY(zmk_knob_profile_switch)
 	res->features.has_knob_profile_switch = res->features.knob_profile_switch = true;
+#else
+	res->features.has_knob_profile_switch = true;
+	res->features.knob_profile_switch = false;
 #endif
 	res->features.has_knob_spring_report = res->features.knob_spring_report = true;
-#endif // CONFIG_HW75_USB_COMM_FEATURE_KNOB
+#else
+	res->features.has_knob = true;
+	res->features.knob = false;
+	res->features.has_knob_prefs = true;
+	res->features.knob_prefs = false;
+	res->features.has_knob_profile_switch = true;
+	res->features.knob_profile_switch = false;
+	res->features.has_knob_spring_report = true;
+	res->features.knob_spring_report = false;
+#endif
 
 	return true;
 }

@@ -5,20 +5,13 @@
 
 #include "handler.h"
 
-#include <zmk/keymap.h>
-
-static uint8_t current_layer = 0;
-
+/*
+ * Legacy: keyboard UART used to force dynamic to layer 1 while FN was held.
+ * hw75_dynamic keymap layer 1 is "scroll" (OLED mode), not an FN mirror — wrong UX.
+ * Keyboard FN is for RGB/media only; ignore FN_STATE from UART.
+ */
 bool handle_fn_state(const uart_comm_MessageK2D *k2d)
 {
-	const uart_comm_FnState *report = &k2d->payload.fn_state;
-
-	if (report->pressed) {
-		current_layer = zmk_keymap_highest_layer_active();
-		zmk_keymap_layer_to(1);
-	} else {
-		zmk_keymap_layer_to(current_layer);
-	}
-
+	(void)k2d;
 	return true;
 }
