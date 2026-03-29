@@ -134,6 +134,13 @@ static struct zmk_led_hsb hsb_scale_zero_max(struct zmk_led_hsb hsb)
 	return hsb;
 }
 
+/* Global brightness from state (matches ZMK / host HSB brightness for animated effects). */
+static uint8_t effect_global_brightness_u8(void)
+{
+	struct zmk_led_hsb t = hsb_scale_min_max(state.color);
+	return (uint8_t)(((uint16_t)t.b * 255) / BRT_MAX);
+}
+
 static struct led_rgb hsb_to_rgb(struct zmk_led_hsb hsb)
 {
 	float r = 0, g = 0, b = 0;
@@ -181,33 +188,37 @@ static struct led_rgb hsb_to_rgb(struct zmk_led_hsb hsb)
 	return (struct led_rgb){.r = (uint8_t)(r * 255), .g = (uint8_t)(g * 255), .b = (uint8_t)(b * 255)};
 }
 
+/* idx 0..15 = hub; idx 16+ => key logical i = idx - 16 using legacy row layout (matches ripple vs keys). */
 static void get_led_pos(uint8_t idx, uint8_t *x, uint8_t *y)
 {
-	if (idx < 14) {
+	if (idx < 16) {
 		*y = 0;
-		*x = (uint8_t)((13 - idx) * 17);
-	} else if (idx < 29) {
+		*x = (uint8_t)(idx * 12);
+		return;
+	}
+	uint8_t i = (uint8_t)(idx - 16);
+	if (i < 14) {
+		*y = 0;
+		*x = (uint8_t)((13 - i) * 17);
+	} else if (i < 29) {
 		*y = 16;
-		*x = (uint8_t)((idx - 14) * 16);
-	} else if (idx < 44) {
+		*x = (uint8_t)((i - 14) * 16);
+	} else if (i < 44) {
 		*y = 32;
-		*x = (uint8_t)(6 + (43 - idx) * 16);
-	} else if (idx < 58) {
+		*x = (uint8_t)(6 + (43 - i) * 16);
+	} else if (i < 58) {
 		*y = 48;
-		*x = (uint8_t)(8 + (idx - 44) * 17);
-	} else if (idx < 72) {
+		*x = (uint8_t)(8 + (i - 44) * 17);
+	} else if (i < 72) {
 		*y = 64;
-		*x = (uint8_t)(12 + (71 - idx) * 16);
-	} else if (idx < 82) {
+		*x = (uint8_t)(12 + (71 - i) * 16);
+	} else if (i < 82) {
 		*y = 80;
 		static const uint8_t row5x[] = {0, 20, 40, 110, 170, 186, 202, 214, 226, 240};
-		*x = row5x[idx - 72];
-	} else if (idx < 85) {
-		*y = 80;
-		*x = (uint8_t)(232 + (idx - 82) * 4);
+		*x = row5x[i - 72];
 	} else {
-		*y = 96;
-		*x = (uint8_t)((idx - 85) * 13);
+		*y = 80;
+		*x = (uint8_t)(232 + (i - 82) * 4);
 	}
 }
 
@@ -218,19 +229,17 @@ static uint8_t approx_dist(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 	return dx > dy ? dx + ((dy * 3) >> 3) : dy + ((dx * 3) >> 3);
 }
 
+/* Key position -> logical LED index (see led-strip-remap: 16 hub LEDs then key rows). */
 static uint8_t key_pos_to_led(uint8_t pos)
 {
 	if (pos >= 82) {
 		return STRIP_NUM_PIXELS - 1;
 	}
-	uint8_t i = pos;
-	uint8_t led = i;
-	if (i < 14) {
-		led = 13 - i;
-	} else if (i >= 29 && i < 44) {
-		led = (uint8_t)(72 - i);
-	} else if (i >= 58 && i < 72) {
-		led = (uint8_t)(129 - i);
+	uint8_t led;
+	if (pos >= 58 && pos < 72) {
+		led = (uint8_t)(145 - pos);
+	} else {
+		led = (uint8_t)(pos + 16);
 	}
 	if (led >= STRIP_NUM_PIXELS) {
 		return STRIP_NUM_PIXELS - 1;
@@ -282,12 +291,15 @@ static void zmk_rgb_underglow_effect_swirl(void)
 
 static void effect_rainbow_sweep(uint32_t tick)
 {
+	uint8_t g = effect_global_brightness_u8();
+
 	for (uint8_t i = 0; i < STRIP_NUM_PIXELS; i++) {
 		uint8_t px, py;
 		get_led_pos(i, &px, &py);
-		uint8_t hue = (uint8_t)(py + px / 4 - tick / 8);
-		uint8_t wave = sin8((uint8_t)(tick / 5 + py / 2 + px / 6));
+		uint8_t hue = (uint8_t)(px + py / 4 - tick / 8);
+		uint8_t wave = sin8((uint8_t)(tick / 5 + px / 2 + py / 6));
 		uint8_t val = (uint8_t)(178 + (((uint16_t)wave * 77) >> 8));
+		val = (uint8_t)(((uint16_t)val * g) / 255);
 		pixels[i] = hsv_to_rgb_u8(hue, 255, val);
 	}
 }
@@ -303,12 +315,15 @@ static void effect_reactive(uint32_t tick)
 		}
 	}
 
+	uint8_t g = effect_global_brightness_u8();
+
 	for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
 		uint8_t b = key_brightness[i];
 		if (b > 0) {
 			uint8_t hue = (uint8_t)(128 + (255 - b) / 4);
 			uint8_t sat = b > 200 ? (uint8_t)(200 + (255 - b) / 2) : 255;
-			pixels[i] = hsv_to_rgb_u8(hue, sat, b);
+			uint8_t vb = (uint8_t)(((uint16_t)b * g) / 255);
+			pixels[i] = hsv_to_rgb_u8(hue, sat, vb);
 		} else {
 			pixels[i] = (struct led_rgb){0};
 		}
@@ -317,24 +332,27 @@ static void effect_reactive(uint32_t tick)
 
 static void effect_aurora(uint32_t tick)
 {
+	uint8_t gbrt = effect_global_brightness_u8();
+
 	for (uint8_t i = 0; i < STRIP_NUM_PIXELS; i++) {
 		uint8_t px, py;
 		get_led_pos(i, &px, &py);
-		uint8_t w1 = sin8((uint8_t)(tick / 11 + py / 2 + px / 5));
-		uint8_t w2 = sin8((uint8_t)(tick / 7 + (240 - py) / 2));
-		uint8_t w3 = sin8((uint8_t)(tick / 13 + py / 3 + px / 4));
-		uint8_t w4 = sin8((uint8_t)(tick / 17 + (240 - py) / 3 + px / 6));
+		uint8_t w1 = sin8((uint8_t)(tick / 11 + px / 2 + py / 5));
+		uint8_t w2 = sin8((uint8_t)(tick / 7 + (240 - px) / 2));
+		uint8_t w3 = sin8((uint8_t)(tick / 13 + px / 3 + py / 4));
+		uint8_t w4 = sin8((uint8_t)(tick / 17 + (240 - px) / 3 + py / 6));
 		uint8_t hue = (uint8_t)(110 + (w1 - 128 + w4 - 128) / 6);
 		uint8_t val = (uint8_t)(((uint16_t)w2 + w3) >> 1);
 		uint8_t sat = 255;
 		if (val > 200) {
 			sat = qsub8(255, (val - 200) * 4);
 		}
+		val = (uint8_t)(((uint16_t)val * gbrt) / 255);
 		struct led_rgb c = hsv_to_rgb_u8(hue, sat, val);
 		uint8_t r = qadd8(c.r, 2);
-		uint8_t g = qadd8((uint8_t)(((uint16_t)c.g * 200) >> 8), 5);
+		uint8_t gch = qadd8((uint8_t)(((uint16_t)c.g * 200) >> 8), 5);
 		uint8_t b = qadd8((uint8_t)(((uint16_t)c.b * 145) >> 8), 7);
-		pixels[i] = (struct led_rgb){.r = r, .g = g, .b = b};
+		pixels[i] = (struct led_rgb){.r = r, .g = gch, .b = b};
 	}
 }
 
@@ -370,6 +388,8 @@ static void effect_ripple(uint32_t tick)
 		}
 	}
 
+	uint8_t gbrt = effect_global_brightness_u8();
+
 	for (uint8_t i = 0; i < STRIP_NUM_PIXELS; i++) {
 		uint8_t px, py;
 		get_led_pos(i, &px, &py);
@@ -399,7 +419,8 @@ static void effect_ripple(uint32_t tick)
 			}
 		}
 		if (best_bright > 0) {
-			pixels[i] = hsv_to_rgb_u8(best_hue, 255, best_bright);
+			uint8_t br = (uint8_t)(((uint16_t)best_bright * gbrt) / 255);
+			pixels[i] = hsv_to_rgb_u8(best_hue, 255, br);
 		} else {
 			pixels[i] = (struct led_rgb){0};
 		}
@@ -408,8 +429,15 @@ static void effect_ripple(uint32_t tick)
 
 static void effect_static_warm(void)
 {
+	uint8_t gbrt = effect_global_brightness_u8();
+	struct led_rgb base = {.r = 255, .g = 180, .b = 80};
+
 	for (int i = 0; i < STRIP_NUM_PIXELS; i++) {
-		pixels[i] = (struct led_rgb){.r = 255, .g = 180, .b = 80};
+		pixels[i] = (struct led_rgb){
+			.r = (uint8_t)(((uint16_t)base.r * gbrt) / 255),
+			.g = (uint8_t)(((uint16_t)base.g * gbrt) / 255),
+			.b = (uint8_t)(((uint16_t)base.b * gbrt) / 255),
+		};
 	}
 }
 

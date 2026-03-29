@@ -28,14 +28,6 @@ static const char *app_version = VER_APP;
 static const char *app_version = "unknown";
 #endif
 
-#if defined(CONFIG_ZMK_KEYBOARD_NAME)
-static const char *device_name = CONFIG_ZMK_KEYBOARD_NAME;
-#elif defined(CONFIG_USB_DEVICE_PRODUCT)
-static const char *device_name = CONFIG_USB_DEVICE_PRODUCT;
-#else
-static const char *device_name = "ZMK Keyboard";
-#endif
-
 static bool write_string(pb_ostream_t *stream, const pb_field_t *field, void *const *arg)
 {
 	char *str = *arg;
@@ -56,52 +48,42 @@ static bool handle_version(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *
 	res->app_version.funcs.encode = write_string;
 	res->app_version.arg = (void *)app_version;
 
-	/* optional string is callback-based in nanopb: no has_device_name */
-	res->device_name.funcs.encode = write_string;
-	res->device_name.arg = (void *)device_name;
-
 	res->has_features = true;
 
 #ifdef CONFIG_HW75_USB_COMM_FEATURE_RGB
-	res->features.has_rgb = res->features.rgb = true;
-	res->features.has_rgb_full_control = res->features.rgb_full_control = true;
-	res->features.has_rgb_indicator = res->features.rgb_indicator = true;
-#endif // CONFIG_HW75_USB_COMM_FEATURE_RGB
+	res->features.has_rgb = true;
+	res->features.rgb = true;
+	res->features.has_rgb_full_control = true;
+	res->features.rgb_full_control = true;
+	res->features.has_rgb_indicator = true;
+	res->features.rgb_indicator = true;
+#endif
 
 #ifdef CONFIG_HW75_EXTENDED_RGB
-	res->features.has_hello_rgb_effects = res->features.hello_rgb_effects = true;
+	res->features.has_hello_rgb_effects = true;
+	res->features.hello_rgb_effects = true;
 #endif
 #ifdef CONFIG_HW75_TOUCHBAR
-	res->features.has_touchbar = res->features.touchbar = true;
+	res->features.has_touchbar = true;
+	res->features.touchbar = true;
 #endif
 
 #ifdef CONFIG_HW75_USB_COMM_FEATURE_EINK
-	res->features.has_eink = res->features.eink = true;
-#else
-	/* ZMKX treats omitted optional bools as "show tab" on some builds */
 	res->features.has_eink = true;
-	res->features.eink = false;
+	res->features.eink = true;
 #endif
 
 #ifdef CONFIG_HW75_USB_COMM_FEATURE_KNOB
-	res->features.has_knob = res->features.knob = true;
-	res->features.has_knob_prefs = res->features.knob_prefs = true;
-#if DT_HAS_COMPAT_STATUS_OKAY(zmk_knob_profile_switch)
-	res->features.has_knob_profile_switch = res->features.knob_profile_switch = true;
-#else
-	res->features.has_knob_profile_switch = true;
-	res->features.knob_profile_switch = false;
-#endif
-	res->features.has_knob_spring_report = res->features.knob_spring_report = true;
-#else
 	res->features.has_knob = true;
-	res->features.knob = false;
+	res->features.knob = true;
 	res->features.has_knob_prefs = true;
-	res->features.knob_prefs = false;
+	res->features.knob_prefs = true;
+#if DT_HAS_COMPAT_STATUS_OKAY(zmk_knob_profile_switch)
 	res->features.has_knob_profile_switch = true;
-	res->features.knob_profile_switch = false;
+	res->features.knob_profile_switch = true;
+#endif
 	res->features.has_knob_spring_report = true;
-	res->features.knob_spring_report = false;
+	res->features.knob_spring_report = true;
 #endif
 
 	return true;

@@ -67,8 +67,6 @@ message Version
 	required string zmk_version = 2;
 	required string app_version = 3;
 	optional Features features = 4;
-	// Shown in host app "About" / device info (ZMKX and similar)
-	optional string device_name = 5;
 
 	message Features
 	{
