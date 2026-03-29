@@ -11,12 +11,6 @@ config HW75_UART_COMM
 
 if HW75_UART_COMM
 
-# When y, keyboard UART tells dynamic MCU to force keymap layer 1 while FN is held.
-# hw75_dynamic layer 1 is not "FN" (e.g. scroll mode) — causes OLED to jump. Default n.
-config HW75_UART_FN_STATE_REPORT
-	bool "UART: report keyboard FN layer to dynamic module"
-	default n
-
 config HW75_UART_COMM_MAX_TX_MESSAGE_SIZE
 	int
 	default 64

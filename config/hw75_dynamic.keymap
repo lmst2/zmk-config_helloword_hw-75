@@ -81,5 +81,13 @@
 			bindings = <&trans &trans>;
 			sensor-bindings = <&inc_dec_kp LEFT RIGHT>;
 		};
+
+		/* Layer for UART from keyboard: handler_fn_state switches here while FN held (see Kconfig). */
+		keyboard_fn {
+			label = "FN";
+			icon = [EF 86 AE];
+			bindings = <&trans &trans>;
+			sensor-bindings = <&inc_dec_kp C_VOL_UP C_VOL_DN>;
+		};
 	};
 };

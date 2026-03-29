@@ -11,6 +11,12 @@ config HW75_UART_COMM
 
 if HW75_UART_COMM
 
+# Index of keymap layer used while keyboard holds FN (UART). Not hardcoded 1: layer 1 is "scroll".
+config HW75_DYNAMIC_UART_FN_TARGET_LAYER
+	int "Keymap layer index when keyboard FN is held"
+	default 5
+	range 0 31
+
 config HW75_UART_COMM_THREAD_PRIORITY
 	int
 	default 10
