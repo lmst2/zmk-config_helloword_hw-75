@@ -338,15 +338,17 @@ static void effect_aurora(uint32_t tick)
 	}
 }
 
+struct hw75_ripple_slot {
+	uint8_t x, y;
+	uint16_t start_tick;
+};
+
 static void effect_ripple(uint32_t tick)
 {
 	static const uint8_t MAX_RIPPLES = 10;
 	static const uint16_t RIPPLE_LIFE = 1000;
 	static const uint8_t RING_WIDTH = 22;
-	static struct {
-		uint8_t x, y;
-		uint16_t start_tick;
-	} ripples[10];
+	static struct hw75_ripple_slot ripples[10];
 	static uint8_t next_slot;
 	static uint8_t prev_pressed[11];
 
@@ -357,7 +359,7 @@ static void effect_ripple(uint32_t tick)
 			uint8_t px, py;
 			get_led_pos(k, &px, &py);
 			ripples[next_slot % MAX_RIPPLES] =
-				(struct){.x = px, .y = py, .start_tick = (uint16_t)tick};
+				(struct hw75_ripple_slot){ .x = px, .y = py, .start_tick = (uint16_t)tick };
 			next_slot++;
 		}
 		if (now) {

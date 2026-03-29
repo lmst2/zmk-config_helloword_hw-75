@@ -2,7 +2,9 @@
  * Copyright (c) 2025
  * SPDX-License-Identifier: MIT
  *
- * HelloWord TouchBar logic: pan (shift+wheel), Alt+Tab switcher, virtual desktop.
+ * HelloWord TouchBar logic: pan uses Shift + vertical wheel so Windows treats it as
+ * horizontal scroll (no dedicated HW wheel axis in our HID report). Sticky Keys may
+ * prompt if enabled in OS. Alt+Tab switcher, virtual desktop.
  */
 
 #include <zephyr/kernel.h>
@@ -60,22 +62,22 @@ static const uint8_t TOUCHBAR_TOUCHES_PER_SEGMENT = 4;
 static const uint8_t TOUCHBAR_ENTRY_TOUCHES_PER_SEGMENT = 3;
 static const uint8_t TOUCHBAR_INVALID_SEGMENT = 0xFF;
 static const uint32_t TOUCHBAR_ACTIVATION_MS = 20;
-static const uint32_t TOUCHBAR_APP_ACTIVATION_MS = 90;
-static const uint32_t TOUCHBAR_DESKTOP_HOLD_MS = 500;
-static const uint32_t TOUCHBAR_APP_EDGE_REPEAT_DELAY_MS = 400;
-static const uint32_t TOUCHBAR_DESKTOP_EDGE_REPEAT_DELAY_MS = 1200;
+static const uint32_t TOUCHBAR_APP_ACTIVATION_MS = 105;
+static const uint32_t TOUCHBAR_DESKTOP_HOLD_MS = 320;
+static const uint32_t TOUCHBAR_APP_EDGE_REPEAT_DELAY_MS = 520;
+static const uint32_t TOUCHBAR_DESKTOP_EDGE_REPEAT_DELAY_MS = 750;
 static const uint32_t TOUCHBAR_APP_RELEASE_SETTLE_MS = 50;
 static const uint32_t TOUCHBAR_RELEASE_GRACE_MS = 35;
 static const uint32_t TOUCHBAR_SWITCH_RELEASE_GRACE_MS = 90;
 static const uint32_t TOUCHBAR_PAN_INTERVAL_MS = 12;
-static const uint32_t TOUCHBAR_APP_STEP_INTERVAL_MS = 55;
-static const uint32_t TOUCHBAR_DESKTOP_STEP_INTERVAL_MS = 500;
+static const uint32_t TOUCHBAR_APP_STEP_INTERVAL_MS = 85;
+static const uint32_t TOUCHBAR_DESKTOP_STEP_INTERVAL_MS = 380;
 static const int16_t TOUCHBAR_POSITION_SCALE = 256;
-static const int16_t TOUCHBAR_DESKTOP_SWIPE_DISTANCE = 96;
+static const int16_t TOUCHBAR_DESKTOP_SWIPE_DISTANCE = 72;
 static const int16_t TOUCHBAR_EDGE_REPEAT_THRESHOLD = 64;
-static const int16_t TOUCHBAR_PAN_DEADZONE = 64;
-static const int16_t TOUCHBAR_STEP_DISTANCE = 160;
-static const int16_t TOUCHBAR_DESKTOP_STEP_DISTANCE = 256;
+static const int16_t TOUCHBAR_PAN_DEADZONE = 48;
+static const int16_t TOUCHBAR_STEP_DISTANCE = 280;
+static const int16_t TOUCHBAR_DESKTOP_STEP_DISTANCE = 192;
 
 static const uint8_t TOUCHBAR_SEGMENT_TOUCH_MAP[2][4] = {{0, 1, 2, 3}, {2, 3, 4, 5}};
 static const uint8_t TOUCHBAR_SEGMENT_ENTRY_TOUCH_MAP[2][3] = {{0, 1, 2}, {3, 4, 5}};
@@ -235,6 +237,7 @@ static void queue_mouse_wheel(int8_t w)
 	if (w == 0) {
 		return;
 	}
+	/* Shift + vertical wheel -> horizontal scroll in most Windows apps */
 	zmk_hid_implicit_modifiers_press(1 << 1);
 	send_kb_report();
 	hid_mouse_wheel_report(w, true);

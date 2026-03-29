@@ -28,6 +28,14 @@ static const char *app_version = VER_APP;
 static const char *app_version = "unknown";
 #endif
 
+#if defined(CONFIG_ZMK_KEYBOARD_NAME)
+static const char *device_name = CONFIG_ZMK_KEYBOARD_NAME;
+#elif defined(CONFIG_USB_DEVICE_PRODUCT)
+static const char *device_name = CONFIG_USB_DEVICE_PRODUCT;
+#else
+static const char *device_name = "ZMK Keyboard";
+#endif
+
 static bool write_string(pb_ostream_t *stream, const pb_field_t *field, void *const *arg)
 {
 	char *str = *arg;
@@ -47,6 +55,10 @@ static bool handle_version(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *
 	res->zmk_version.arg = (void *)zmk_version;
 	res->app_version.funcs.encode = write_string;
 	res->app_version.arg = (void *)app_version;
+
+	res->has_device_name = true;
+	res->device_name.funcs.encode = write_string;
+	res->device_name.arg = (void *)device_name;
 
 	res->has_features = true;
 

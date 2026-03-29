@@ -8,7 +8,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   dfu-util device-tree-compiler wget xz-utils protobuf-compiler \
   libprotobuf-dev
 
-python3 -m pip install --user -q west 'protobuf>=4'
+python3 -m pip install --user -q west 'protobuf>=4.21.6,<5'
 
 ROOT="/mnt/e/code/zmk-config_helloword_hw-75"
 cd "${ROOT}"
@@ -19,8 +19,9 @@ fi
 west update
 west zephyr-export
 pip install --user -q -r zephyr/scripts/requirements.txt
+python3 -m pip install --user --force-reinstall -q 'protobuf==4.25.3'
 
-# Zephyr SDK (ARM) — required for STM32 build
+# Zephyr SDK (ARM) for STM32
 SDK_VER="0.16.8"
 SDK_DIR="${HOME}/zephyr-sdk-${SDK_VER}"
 if [[ ! -d "${SDK_DIR}" ]]; then

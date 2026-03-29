@@ -4,7 +4,7 @@
 config HW75_EXTENDED_RGB
 	bool "HelloWord-style per-key RGB effects (replaces stock ZMK RGB)"
 	default n
-	depends on DT_HAS_CHOSEN(zmk_underglow)
+	depends on BOARD_HW75_KEYBOARD || BOARD_HW75_DYNAMIC
 	select LED_STRIP
 	select WS2812_STRIP
 	select SPI
