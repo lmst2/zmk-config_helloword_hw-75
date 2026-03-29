@@ -7,17 +7,17 @@
 
 #include <zmk/keymap.h>
 
-static uint8_t saved_layer;
+static uint8_t current_layer = 0;
 
 bool handle_fn_state(const uart_comm_MessageK2D *k2d)
 {
 	const uart_comm_FnState *report = &k2d->payload.fn_state;
 
 	if (report->pressed) {
-		saved_layer = zmk_keymap_highest_layer_active();
-		zmk_keymap_layer_to(CONFIG_HW75_DYNAMIC_UART_FN_TARGET_LAYER);
+		current_layer = zmk_keymap_highest_layer_active();
+		zmk_keymap_layer_to(1);
 	} else {
-		zmk_keymap_layer_to(saved_layer);
+		zmk_keymap_layer_to(current_layer);
 	}
 
 	return true;

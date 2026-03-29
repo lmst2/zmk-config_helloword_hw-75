@@ -51,40 +51,25 @@ static bool handle_version(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *
 	res->has_features = true;
 
 #ifdef CONFIG_HW75_USB_COMM_FEATURE_RGB
-	res->features.has_rgb = true;
-	res->features.rgb = true;
-	res->features.has_rgb_full_control = true;
-	res->features.rgb_full_control = true;
-	res->features.has_rgb_indicator = true;
-	res->features.rgb_indicator = true;
-#endif
-
-#ifdef CONFIG_HW75_EXTENDED_RGB
-	res->features.has_hello_rgb_effects = true;
-	res->features.hello_rgb_effects = true;
-#endif
-#ifdef CONFIG_HW75_TOUCHBAR
-	res->features.has_touchbar = true;
-	res->features.touchbar = true;
-#endif
+	res->features.has_rgb = res->features.rgb = true;
+	res->features.has_rgb_full_control = res->features.rgb_full_control = true;
+	res->features.has_rgb_indicator = res->features.rgb_indicator = true;
+#endif // CONFIG_HW75_USB_COMM_FEATURE_RGB
 
 #ifdef CONFIG_HW75_USB_COMM_FEATURE_EINK
-	res->features.has_eink = true;
-	res->features.eink = true;
-#endif
+	res->features.has_eink = res->features.eink = true;
+#endif // CONFIG_HW75_USB_COMM_FEATURE_EINK
 
 #ifdef CONFIG_HW75_USB_COMM_FEATURE_KNOB
-	res->features.has_knob = true;
-	res->features.knob = true;
-	res->features.has_knob_prefs = true;
-	res->features.knob_prefs = true;
+	res->features.has_knob = res->features.knob = true;
+	res->features.has_knob_prefs = res->features.knob_prefs = true;
+#endif // CONFIG_HW75_USB_COMM_FEATURE_KNOB
+
 #if DT_HAS_COMPAT_STATUS_OKAY(zmk_knob_profile_switch)
-	res->features.has_knob_profile_switch = true;
-	res->features.knob_profile_switch = true;
-#endif
-	res->features.has_knob_spring_report = true;
-	res->features.knob_spring_report = true;
-#endif
+	res->features.has_knob_profile_switch = res->features.knob_profile_switch = true;
+#endif // DT_HAS_COMPAT_STATUS_OKAY(zmk_knob_profile_switch)
+
+	res->features.has_knob_spring_report = res->features.knob_spring_report = true;
 
 	return true;
 }

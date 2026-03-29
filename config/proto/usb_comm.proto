@@ -78,8 +78,6 @@ message Version
 		optional bool knob_prefs = 4;
 		optional bool knob_profile_switch = 7;
 		optional bool knob_spring_report = 8;
-		optional bool hello_rgb_effects = 9;
-		optional bool touchbar = 10;
 	}
 }
 
@@ -167,11 +165,6 @@ message RgbState
 		BREATHE = 1;
 		SPECTRUM = 2;
 		SWIRL = 3;
-		RAINBOW_SWEEP = 4;
-		REACTIVE = 5;
-		AURORA = 6;
-		RIPPLE = 7;
-		STATIC_WARM_WHITE = 8;
 	}
 }
 
