@@ -56,7 +56,7 @@ static bool handle_version(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *
 	res->app_version.funcs.encode = write_string;
 	res->app_version.arg = (void *)app_version;
 
-	res->has_device_name = true;
+	/* optional string is callback-based in nanopb: no has_device_name */
 	res->device_name.funcs.encode = write_string;
 	res->device_name.arg = (void *)device_name;
 

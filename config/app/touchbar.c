@@ -7,6 +7,7 @@
  * prompt if enabled in OS. Alt+Tab switcher, virtual desktop.
  */
 
+#include <zephyr/device.h>
 #include <zephyr/kernel.h>
 
 #include <zephyr/logging/log.h>
@@ -595,8 +596,9 @@ ZMK_SUBSCRIPTION(touchbar_pos, zmk_position_state_changed);
 ZMK_LISTENER(touchbar_layer, layer_listener);
 ZMK_SUBSCRIPTION(touchbar_layer, zmk_layer_state_changed);
 
-static int touchbar_init(void)
+static int touchbar_init(const struct device *dev)
 {
+	ARG_UNUSED(dev);
 	k_work_init_delayable(&touchbar_work, touchbar_work_handler);
 	k_work_schedule(&touchbar_work, K_MSEC(100));
 	return 0;
