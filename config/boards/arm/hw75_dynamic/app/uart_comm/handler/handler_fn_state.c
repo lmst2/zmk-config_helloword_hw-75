@@ -5,8 +5,6 @@
 
 #include "handler.h"
 
-#include <zephyr/autoconf.h>
-
 #include <zmk/keymap.h>
 
 static uint8_t saved_layer;
