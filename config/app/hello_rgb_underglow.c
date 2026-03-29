@@ -285,8 +285,8 @@ static void effect_rainbow_sweep(uint32_t tick)
 	for (uint8_t i = 0; i < STRIP_NUM_PIXELS; i++) {
 		uint8_t px, py;
 		get_led_pos(i, &px, &py);
-		uint8_t hue = (uint8_t)(px - tick / 8);
-		uint8_t wave = sin8((uint8_t)(tick / 5 + px / 2));
+		uint8_t hue = (uint8_t)(py + px / 4 - tick / 8);
+		uint8_t wave = sin8((uint8_t)(tick / 5 + py / 2 + px / 6));
 		uint8_t val = (uint8_t)(178 + (((uint16_t)wave * 77) >> 8));
 		pixels[i] = hsv_to_rgb_u8(hue, 255, val);
 	}
@@ -320,10 +320,10 @@ static void effect_aurora(uint32_t tick)
 	for (uint8_t i = 0; i < STRIP_NUM_PIXELS; i++) {
 		uint8_t px, py;
 		get_led_pos(i, &px, &py);
-		uint8_t w1 = sin8((uint8_t)(tick / 11 + px / 2));
-		uint8_t w2 = sin8((uint8_t)(tick / 7 + (240 - px) / 2));
-		uint8_t w3 = sin8((uint8_t)(tick / 13 + px / 3 + py));
-		uint8_t w4 = sin8((uint8_t)(tick / 17 + (240 - px) / 3));
+		uint8_t w1 = sin8((uint8_t)(tick / 11 + py / 2 + px / 5));
+		uint8_t w2 = sin8((uint8_t)(tick / 7 + (240 - py) / 2));
+		uint8_t w3 = sin8((uint8_t)(tick / 13 + py / 3 + px / 4));
+		uint8_t w4 = sin8((uint8_t)(tick / 17 + (240 - py) / 3 + px / 6));
 		uint8_t hue = (uint8_t)(110 + (w1 - 128 + w4 - 128) / 6);
 		uint8_t val = (uint8_t)(((uint16_t)w2 + w3) >> 1);
 		uint8_t sat = 255;
@@ -357,7 +357,8 @@ static void effect_ripple(uint32_t tick)
 		bool was = prev_pressed[k >> 3] & (1 << (k & 7));
 		if (now && !was) {
 			uint8_t px, py;
-			get_led_pos(k, &px, &py);
+			uint8_t li = key_pos_to_led(k);
+			get_led_pos(li, &px, &py);
 			ripples[next_slot % MAX_RIPPLES] =
 				(struct hw75_ripple_slot){ .x = px, .y = py, .start_tick = (uint16_t)tick };
 			next_slot++;
