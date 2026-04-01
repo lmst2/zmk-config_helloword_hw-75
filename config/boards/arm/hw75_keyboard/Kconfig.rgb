@@ -5,8 +5,29 @@ config ZMK_RGB_UNDERGLOW
 	default n
 
 config HW75_RGB_UNDERGLOW
+	bool "HelloWord RGB underglow"
 	default y
 	select HW75_USB_COMM_FEATURE_RGB
 	select WS2812_STRIP
 	select LED_STRIP
 	select SPI
+
+config ZMK_RGB_UNDERGLOW_EFF_START
+	int
+	depends on HW75_RGB_UNDERGLOW
+	default 0
+
+config ZMK_RGB_UNDERGLOW_EXT_POWER
+	bool
+	depends on HW75_RGB_UNDERGLOW
+	default n
+
+config ZMK_RGB_UNDERGLOW_AUTO_OFF_IDLE
+	bool
+	depends on HW75_RGB_UNDERGLOW
+	default n
+
+config ZMK_RGB_UNDERGLOW_BRT_MAX
+	int
+	depends on HW75_RGB_UNDERGLOW
+	default 100
