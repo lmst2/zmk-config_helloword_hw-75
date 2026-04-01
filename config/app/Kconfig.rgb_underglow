@@ -4,59 +4,69 @@
 if HW75_RGB_UNDERGLOW
 
 config HW75_RGB_UNDERGLOW_HUE_START
-	int
+	int "HelloWord RGB initial hue"
 	default 0
+	range 0 359
 
 config HW75_RGB_UNDERGLOW_SAT_START
-	int
+	int "HelloWord RGB initial saturation"
 	default 100
+	range 0 100
 
 config HW75_RGB_UNDERGLOW_BRT_START
-	int
+	int "HelloWord RGB initial brightness"
 	default 40
+	range 0 100
 
 config HW75_RGB_UNDERGLOW_SPD_START
-	int
+	int "HelloWord RGB initial speed"
 	default 2
+	range 1 5
 
 config HW75_RGB_UNDERGLOW_EFF_START
-	int
+	int "HelloWord RGB initial effect"
 	default 0
+	range 0 8
 
 config HW75_RGB_UNDERGLOW_HUE_STEP
-	int
+	int "HelloWord RGB hue step"
 	default 10
+	range 1 359
 
 config HW75_RGB_UNDERGLOW_SAT_STEP
-	int
+	int "HelloWord RGB saturation step"
 	default 5
+	range 1 100
 
 config HW75_RGB_UNDERGLOW_BRT_STEP
-	int
+	int "HelloWord RGB brightness step"
 	default 5
+	range 1 100
 
 config HW75_RGB_UNDERGLOW_BRT_MIN
-	int
+	int "HelloWord RGB minimum brightness"
 	default 0
+	range 0 100
 
 config HW75_RGB_UNDERGLOW_BRT_MAX
-	int
+	int "HelloWord RGB maximum brightness"
 	default 100
+	range 0 100
 
 config HW75_RGB_UNDERGLOW_ON_START
-	bool
+	bool "HelloWord RGB on at startup"
 	default y
 
 config HW75_RGB_UNDERGLOW_AUTO_OFF_IDLE
-	bool
+	bool "HelloWord RGB auto off when idle"
 	default n
 
 config HW75_RGB_UNDERGLOW_AUTO_OFF_USB
-	bool
+	bool "HelloWord RGB auto off when USB is disconnected"
 	default n
 
 config HW75_RGB_UNDERGLOW_EXT_POWER
-	bool
+	bool "HelloWord RGB uses external power control"
 	default n
 
 endif # HW75_RGB_UNDERGLOW
