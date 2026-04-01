@@ -4,3 +4,4 @@
 zephyr_library_include_directories(${APPLICATION_SOURCE_DIR}/include)
 
 add_subdirectory_ifdef(CONFIG_HW75_UART_COMM uart_comm)
+zephyr_library_sources_ifdef(CONFIG_HW75_TOUCHBAR touchbar_app.c)

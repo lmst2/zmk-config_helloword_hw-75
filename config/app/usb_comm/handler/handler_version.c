@@ -65,6 +65,11 @@ static bool handle_version(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *
 	res->features.has_knob_prefs = res->features.knob_prefs = true;
 #endif // CONFIG_HW75_USB_COMM_FEATURE_KNOB
 
+#ifdef CONFIG_HW75_USB_COMM_FEATURE_TOUCHBAR
+	res->features.has_touchbar = res->features.touchbar = true;
+	res->features.has_touchbar_prefs = res->features.touchbar_prefs = true;
+#endif // CONFIG_HW75_USB_COMM_FEATURE_TOUCHBAR
+
 #if DT_HAS_COMPAT_STATUS_OKAY(zmk_knob_profile_switch)
 	res->features.has_knob_profile_switch = res->features.knob_profile_switch = true;
 #endif // DT_HAS_COMPAT_STATUS_OKAY(zmk_knob_profile_switch)

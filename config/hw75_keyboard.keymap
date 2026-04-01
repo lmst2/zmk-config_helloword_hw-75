@@ -4,6 +4,7 @@
  */
 
 #include <behaviors.dtsi>
+#include <behaviors/rgb_underglow.dtsi>
 #include <dt-bindings/zmk/keys.h>
 #include <dt-bindings/zmk/rgb.h>
 
@@ -27,7 +28,7 @@
 				&kp CLCK  &kp A     &kp S     &kp D   &kp F   &kp G   &kp H     &kp J   &kp K   &kp L     &kp SEMI  &kp SQT             &kp RET   &kp PG_UP
 				&kp LSHFT           &kp Z     &kp X   &kp C   &kp V   &kp B     &kp N   &kp M   &kp COMMA &kp DOT   &kp FSLH  &kp RSHFT &kp UP    &kp PG_DN
 				&kp LCTRL &kp LGUI  &kp LALT                          &kp SPACE                 &kp RALT  &mo FN    &kp RCTRL &kp LEFT  &kp DOWN  &kp RIGHT
-				&none &sl TOUCH &sl TOUCH &sl TOUCH &sl TOUCH &none
+				&none &none &none &none &none &none
 			>;
 		};
 
@@ -40,7 +41,7 @@
 				&trans          &rgb_ug RGB_EFR &rgb_ug RGB_BRD &rgb_ug RGB_HUD &rgb_ug RGB_SAD &rgb_ug RGB_SPD &trans  &trans  &trans      &trans    &trans      &trans                    &trans        &trans
 				&trans                          &trans          &trans          &trans          &trans          &trans  &trans  &trans      &trans    &trans      &trans      &trans        &trans        &trans
 				&trans          &trans          &trans                                                          &trans                      &trans    &trans      &trans      &trans        &trans        &trans
-				&trans  &trans  &trans  &trans  &trans  &trans
+				&none  &none  &none  &none  &none  &none
 			>;
 		};
 
@@ -53,7 +54,7 @@
 				&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans          &trans  &trans
 				&trans          &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
 				&trans  &trans  &trans                          &trans                  &trans  &trans  &trans  &trans  &trans  &trans
-				&kp C_VOL_DN &none &none &none &none &kp C_VOL_UP
+				&none &none &none &none &none &none
 			>;
 		};
 	};

@@ -1,0 +1,8 @@
+# Copyright (c) 2022-2023 XiNGRZ
+# SPDX-License-Identifier: MIT
+
+config HW75_RGB_UNDERGLOW
+	bool "HelloWord RGB underglow"
+	depends on LED_STRIP
+	select SPI
+

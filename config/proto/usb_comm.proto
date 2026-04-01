@@ -21,6 +21,9 @@ enum Action {
 	RGB_SET_STATE = 8;
 	RGB_GET_INDICATOR = 10;
 	RGB_SET_INDICATOR = 11;
+	TOUCHBAR_GET_CONFIG = 12;
+	TOUCHBAR_SET_CONFIG = 13;
+	TOUCHBAR_UPDATE_PREF = 14;
 	EINK_SET_IMAGE = 7;
 }
 
@@ -37,6 +40,8 @@ message MessageH2D
 		RgbControl rgb_control = 4;
 		RgbState rgb_state = 7;
 		RgbIndicator rgb_indicator = 8;
+		TouchbarConfig touchbar_config = 9;
+		TouchbarConfig.Pref touchbar_pref = 10;
 		EinkImage eink_image = 5;
 	}
 }
@@ -53,6 +58,8 @@ message MessageD2H
 		KnobConfig.Pref knob_pref = 8;
 		RgbState rgb_state = 6;
 		RgbIndicator rgb_indicator = 9;
+		TouchbarConfig touchbar_config = 10;
+		TouchbarConfig.Pref touchbar_pref = 11;
 		EinkImage eink_image = 7;
 	}
 }
@@ -78,6 +85,8 @@ message Version
 		optional bool knob_prefs = 4;
 		optional bool knob_profile_switch = 7;
 		optional bool knob_spring_report = 8;
+		optional bool touchbar = 9;
+		optional bool touchbar_prefs = 10;
 	}
 }
 
@@ -165,6 +174,11 @@ message RgbState
 		BREATHE = 1;
 		SPECTRUM = 2;
 		SWIRL = 3;
+		RAINBOW_SWEEP = 4;
+		REACTIVE = 5;
+		AURORA = 6;
+		RIPPLE = 7;
+		STATIC = 8;
 	}
 }
 
@@ -173,6 +187,29 @@ message RgbIndicator
 	optional bool enable = 1;
 	optional uint32 brightness_active = 2;
 	optional uint32 brightness_inactive = 3;
+}
+
+message TouchbarConfig
+{
+	required bool enable = 1;
+	optional Mode default_mode = 2;
+	optional Mode mode = 3;
+	repeated Pref prefs = 4;
+
+	enum Mode {
+		DISABLE = 0;
+		PAN = 1;
+		APP_SWITCH = 2;
+		DESKTOP_SWITCH = 3;
+	}
+
+	message Pref
+	{
+		required uint32 layer_id = 1;
+		optional string layer_name = 2;
+		required bool active = 3;
+		optional Mode mode = 4;
+	}
 }
 
 message EinkImage

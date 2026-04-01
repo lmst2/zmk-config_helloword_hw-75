@@ -3,7 +3,6 @@
 
 config HW75_USB_COMM
 	default y
-	select HW75_USB_COMM_FEATURE_RGB
 	select HW75_USB_COMM_FEATURE_EINK
 	select HW75_USB_COMM_FEATURE_KNOB
 

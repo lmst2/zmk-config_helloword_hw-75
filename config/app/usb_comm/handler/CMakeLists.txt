@@ -17,6 +17,11 @@ zephyr_library_compile_definitions(
 zephyr_library_sources_ifdef(CONFIG_HW75_USB_COMM_FEATURE_KNOB handler_knob.c)
 zephyr_library_include_directories_ifdef(CONFIG_HW75_USB_COMM_FEATURE_KNOB ${BOARD_DIR}/app)
 
+# handler - touchbar
+
+zephyr_library_sources_ifdef(CONFIG_HW75_USB_COMM_FEATURE_TOUCHBAR handler_touchbar.c)
+zephyr_library_include_directories_ifdef(CONFIG_HW75_USB_COMM_FEATURE_TOUCHBAR ${BOARD_DIR}/app)
+
 # handler - rgb
 
 zephyr_library_sources_ifdef(CONFIG_HW75_USB_COMM_FEATURE_RGB handler_rgb.c)

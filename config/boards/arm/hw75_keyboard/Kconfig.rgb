@@ -2,7 +2,11 @@
 # SPDX-License-Identifier: MIT
 
 config ZMK_RGB_UNDERGLOW
+	default n
+
+config HW75_RGB_UNDERGLOW
 	default y
+	select HW75_USB_COMM_FEATURE_RGB
 	select WS2812_STRIP
 	select LED_STRIP
 	select SPI

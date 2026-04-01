@@ -1,0 +1,9 @@
+# Copyright (c) 2022-2023 XiNGRZ
+# SPDX-License-Identifier: MIT
+
+config HW75_TOUCHBAR
+	bool "HelloWord TouchBar support"
+	default y
+	select HW75_HID_MOUSE
+	select HW75_USB_COMM_FEATURE_TOUCHBAR
+	depends on SETTINGS
