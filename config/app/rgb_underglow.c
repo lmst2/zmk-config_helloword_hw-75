@@ -660,6 +660,45 @@ int zmk_rgb_underglow_get_state(bool *on_off)
 	return 0;
 }
 
+int zmk_rgb_underglow_get_hsb(struct zmk_led_hsb *color)
+{
+	if (!led_strip) {
+		return -ENODEV;
+	}
+	if (color == NULL) {
+		return -EINVAL;
+	}
+
+	*color = state.color;
+	return 0;
+}
+
+int zmk_rgb_underglow_get_speed(uint8_t *speed)
+{
+	if (!led_strip) {
+		return -ENODEV;
+	}
+	if (speed == NULL) {
+		return -EINVAL;
+	}
+
+	*speed = state.animation_speed;
+	return 0;
+}
+
+int zmk_rgb_underglow_get_effect(uint8_t *effect)
+{
+	if (!led_strip) {
+		return -ENODEV;
+	}
+	if (effect == NULL) {
+		return -EINVAL;
+	}
+
+	*effect = state.current_effect;
+	return 0;
+}
+
 int zmk_rgb_underglow_on(void)
 {
 	if (!led_strip) {
@@ -740,7 +779,7 @@ int zmk_rgb_underglow_toggle(void)
 
 int zmk_rgb_underglow_set_hsb(struct zmk_led_hsb color)
 {
-	if (color.h > HUE_MAX || color.s > SAT_MAX || color.b > BRT_MAX) {
+	if (color.h >= HUE_MAX || color.s > SAT_MAX || color.b > BRT_MAX) {
 		return -ENOTSUP;
 	}
 
@@ -819,6 +858,19 @@ int zmk_rgb_underglow_change_spd(int direction)
 	}
 
 	state.animation_speed = CLAMP((int)state.animation_speed + direction, 1, 5);
+	k_mutex_unlock(&lock);
+
+	return zmk_rgb_underglow_save_state();
+}
+
+int zmk_rgb_underglow_set_speed(uint8_t speed)
+{
+	if (!led_strip) {
+		return -ENODEV;
+	}
+
+	k_mutex_lock(&lock, K_FOREVER);
+	state.animation_speed = CLAMP((int)speed, 1, 5);
 	k_mutex_unlock(&lock);
 
 	return zmk_rgb_underglow_save_state();

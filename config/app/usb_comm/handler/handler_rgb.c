@@ -66,19 +66,37 @@ static bool handle_rgb_get_state(const usb_comm_MessageH2D *h2d, usb_comm_Messag
 				 const void *bytes, uint32_t bytes_len)
 {
 	usb_comm_RgbState *res = &d2h->payload.rgb_state;
+	struct zmk_led_hsb color;
+	uint8_t effect;
+	uint8_t speed;
+
+	ARG_UNUSED(h2d);
+	ARG_UNUSED(bytes);
+	ARG_UNUSED(bytes_len);
 
 	if (zmk_rgb_underglow_get_state(&res->on) != 0) {
 		return false;
 	}
 
-	struct zmk_led_hsb color = zmk_rgb_underglow_calc_hue(0);
+	if (zmk_rgb_underglow_get_hsb(&color) != 0) {
+		return false;
+	}
 	res->color.h = color.h;
 	res->color.s = color.s;
 	res->color.b = color.b;
 	res->has_color = true;
 
-	res->effect = zmk_rgb_underglow_calc_effect(0);
+	if (zmk_rgb_underglow_get_effect(&effect) != 0) {
+		return false;
+	}
+	res->effect = effect;
 	res->has_effect = true;
+
+	if (zmk_rgb_underglow_get_speed(&speed) != 0) {
+		return false;
+	}
+	res->speed = speed;
+	res->has_speed = true;
 
 	return true;
 }
@@ -107,6 +125,9 @@ static bool handle_rgb_set_state(const usb_comm_MessageH2D *h2d, usb_comm_Messag
 
 	if (req->has_effect) {
 		zmk_rgb_underglow_select_effect((int)req->effect);
+	}
+	if (req->has_speed) {
+		zmk_rgb_underglow_set_speed((uint8_t)req->speed);
 	}
 
 	return handle_rgb_get_state(h2d, d2h, bytes, bytes_len);
