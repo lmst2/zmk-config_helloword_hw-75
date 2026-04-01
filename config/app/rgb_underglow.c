@@ -600,8 +600,10 @@ static void zmk_rgb_underglow_save_state_work(struct k_work *_work)
 static struct k_work_delayable underglow_save_work;
 #endif
 
-static int zmk_rgb_underglow_init(void)
+static int zmk_rgb_underglow_init(const struct device *dev)
 {
+	ARG_UNUSED(dev);
+
 	led_strip = DEVICE_DT_GET(STRIP_CHOSEN);
 	if (!device_is_ready(led_strip)) {
 		return -ENODEV;

@@ -147,8 +147,13 @@ static const struct behavior_driver_api behavior_rgb_underglow_driver_api = {
 	.locality = BEHAVIOR_LOCALITY_GLOBAL,
 };
 
-BEHAVIOR_DT_INST_DEFINE(0, NULL, NULL, NULL, NULL, POST_KERNEL,
-			CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,
-			&behavior_rgb_underglow_driver_api);
+static int behavior_rgb_underglow_init(const struct device *dev)
+{
+	ARG_UNUSED(dev);
+	return 0;
+};
+
+DEVICE_DT_INST_DEFINE(0, behavior_rgb_underglow_init, NULL, NULL, NULL, APPLICATION,
+		      CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &behavior_rgb_underglow_driver_api);
 
 #endif
