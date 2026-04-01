@@ -1,6 +1,62 @@
 # Copyright (c) 2022-2023 XiNGRZ
 # SPDX-License-Identifier: MIT
 
-# Deprecated placeholder.
-# The HW75 RGB underglow symbol is defined by board-level Kconfig files so it can
-# select the required transport/LED dependencies without creating a dependency loop.
+if HW75_RGB_UNDERGLOW
+
+config HW75_RGB_UNDERGLOW_HUE_START
+	int
+	default 0
+
+config HW75_RGB_UNDERGLOW_SAT_START
+	int
+	default 100
+
+config HW75_RGB_UNDERGLOW_BRT_START
+	int
+	default 40
+
+config HW75_RGB_UNDERGLOW_SPD_START
+	int
+	default 2
+
+config HW75_RGB_UNDERGLOW_EFF_START
+	int
+	default 0
+
+config HW75_RGB_UNDERGLOW_HUE_STEP
+	int
+	default 10
+
+config HW75_RGB_UNDERGLOW_SAT_STEP
+	int
+	default 5
+
+config HW75_RGB_UNDERGLOW_BRT_STEP
+	int
+	default 5
+
+config HW75_RGB_UNDERGLOW_BRT_MIN
+	int
+	default 0
+
+config HW75_RGB_UNDERGLOW_BRT_MAX
+	int
+	default 100
+
+config HW75_RGB_UNDERGLOW_ON_START
+	bool
+	default y
+
+config HW75_RGB_UNDERGLOW_AUTO_OFF_IDLE
+	bool
+	default n
+
+config HW75_RGB_UNDERGLOW_AUTO_OFF_USB
+	bool
+	default n
+
+config HW75_RGB_UNDERGLOW_EXT_POWER
+	bool
+	default n
+
+endif # HW75_RGB_UNDERGLOW
