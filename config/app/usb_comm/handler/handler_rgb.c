@@ -9,6 +9,11 @@
 #include <zmk/rgb_underglow.h>
 #include <app/indicator.h>
 
+int zmk_rgb_underglow_get_hsb(struct zmk_led_hsb *color);
+int zmk_rgb_underglow_get_speed(uint8_t *speed);
+int zmk_rgb_underglow_get_effect(uint8_t *effect);
+int zmk_rgb_underglow_set_speed(uint8_t speed);
+
 static bool handle_rgb_get_state(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *d2h,
 				 const void *bytes, uint32_t bytes_len);
 

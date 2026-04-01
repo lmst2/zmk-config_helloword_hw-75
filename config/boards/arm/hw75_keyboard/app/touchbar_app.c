@@ -123,7 +123,7 @@ static const uint8_t
 
 static int touchbar_send_keyboard_report(void)
 {
-	return zmk_endpoint_send_report(HID_USAGE_KEY);
+	return zmk_endpoints_send_report(HID_USAGE_KEY);
 }
 
 static bool touchbar_has_physical_touch(void)
