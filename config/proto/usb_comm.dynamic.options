@@ -1,0 +1,17 @@
+# Copyright (c) 2026
+# SPDX-License-Identifier: MIT
+#
+# Nanopb options for the dynamic firmware. The touchbar and function-slot
+# payloads are keyboard-only (their Kconfigs depend on BOARD_HW75_KEYBOARD),
+# so drop them from the dynamic-side C struct.
+
+# H2D payloads handled only by keyboard.
+usb.comm.MessageH2D.touchbar_config       type:FT_IGNORE
+usb.comm.MessageH2D.function_slot_request type:FT_IGNORE
+usb.comm.MessageH2D.function_slot_config  type:FT_IGNORE
+
+# D2H payloads emitted only by keyboard.
+usb.comm.MessageD2H.touchbar_config      type:FT_IGNORE
+usb.comm.MessageD2H.function_slot_config type:FT_IGNORE
+usb.comm.MessageD2H.function_slot_caps   type:FT_IGNORE
+usb.comm.MessageD2H.function_slot_events type:FT_IGNORE

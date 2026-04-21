@@ -14,6 +14,8 @@ LOG_MODULE_DECLARE(usb_comm, CONFIG_HW75_USB_COMM_LOG_LEVEL);
 #include <pb_encode.h>
 #include <pb_decode.h>
 
+#include <app/diag_log.h>
+
 #include "usb_comm_hid.h"
 #include "usb_comm.pb.h"
 
@@ -27,9 +29,51 @@ static struct k_thread usb_comm_thread;
 static uint32_t usb_rx_idx, usb_rx_len;
 static uint8_t usb_rx_buf[CONFIG_HW75_USB_COMM_MAX_RX_MESSAGE_SIZE];
 static uint8_t usb_tx_buf[CONFIG_HW75_USB_COMM_MAX_TX_MESSAGE_SIZE];
+/*
+ * USB comm requests are handled on a single worker thread. Reusing one H2D/D2H
+ * message pair avoids reserving the full protobuf union payloads on the 1 KB
+ * thread stack for every request.
+ */
+static usb_comm_MessageH2D usb_h2d_msg;
+static usb_comm_MessageD2H usb_d2h_msg;
 
 static uint8_t bytes_field[CONFIG_HW75_USB_COMM_MAX_BYTES_FIELD_SIZE];
 static uint32_t bytes_field_len = 0;
+
+static void usb_comm_log_stack_watermark(uint16_t action, uint16_t stage) {
+#if defined(CONFIG_INIT_STACKS) && defined(CONFIG_THREAD_STACK_INFO)
+	static const uint8_t thresholds[] = {50U, 70U, 90U, 100U};
+	static uint8_t threshold_index;
+	size_t unused = 0U;
+	size_t used = 0U;
+	size_t used_pct = 0U;
+
+	if (k_thread_stack_space_get(k_current_get(), &unused) != 0) {
+		return;
+	}
+
+	unused = MIN(unused, (size_t)CONFIG_HW75_USB_COMM_THREAD_STACK_SIZE);
+	used = (size_t)CONFIG_HW75_USB_COMM_THREAD_STACK_SIZE - unused;
+	used_pct = (used * 100U) / CONFIG_HW75_USB_COMM_THREAD_STACK_SIZE;
+
+	while (threshold_index < (sizeof(thresholds) / sizeof(thresholds[0])) &&
+	       used_pct >= thresholds[threshold_index]) {
+		uint16_t stage_and_threshold =
+			(uint16_t)stage | ((uint16_t)thresholds[threshold_index] << 8);
+
+		hw75_diag_log_event(HW75_DIAG_LEVEL_WARN, HW75_DIAG_MODULE_USB_COMM, 0U,
+				    HW75_DIAG_EVENT_USB_STACK_WATERMARK,
+				    hw75_diag_pack_u16x2(action, (uint16_t)unused), true,
+				    hw75_diag_pack_u16x2(
+					    CONFIG_HW75_USB_COMM_THREAD_STACK_SIZE,
+					    stage_and_threshold));
+		threshold_index++;
+	}
+#else
+	ARG_UNUSED(action);
+	ARG_UNUSED(stage);
+#endif
+}
 
 #if CONFIG_HW75_USB_COMM_MAX_BYTES_FIELD_SIZE
 static bool read_bytes_field(pb_istream_t *stream, const pb_field_t *field, void **arg)
@@ -56,16 +100,58 @@ static bool read_bytes_field(pb_istream_t *stream, const pb_field_t *field, void
 }
 #endif
 
-#if CONFIG_HW75_USB_COMM_MAX_BYTES_FIELD_SIZE
+#if defined(CONFIG_HW75_EINK_MODES)
+extern void usb_comm_eink_mode_prepare_decode(usb_comm_EinkModeConfig *cfg);
+#endif
+#if defined(CONFIG_HW75_TOUCHBAR)
+extern void usb_comm_touchbar_prepare_decode(usb_comm_TouchbarConfig *cfg);
+#endif
+#if defined(CONFIG_HW75_FUNCTION_SLOT)
+extern void usb_comm_function_slot_prepare_decode(usb_comm_FunctionSlotConfig *cfg);
+#endif
+
+/*
+ * MessageH2D has `submsg_callback = true`, which generates a cb_payload hook
+ * that fires when pb_decode is about to enter one of the oneof submessages.
+ * We use that hook to wire per-field decode callbacks for oneof members that
+ * were marked FT_CALLBACK (to keep the oneof union small). The hook itself
+ * is always compiled; its individual branches are guarded by the feature
+ * they serve so boards that never handle a given action pay no flash for it.
+ */
 static bool h2d_callback(pb_istream_t *stream, const pb_field_t *field, void **arg)
 {
+	ARG_UNUSED(stream);
+	ARG_UNUSED(arg);
+#if CONFIG_HW75_USB_COMM_MAX_BYTES_FIELD_SIZE
 	if (field->tag == usb_comm_MessageH2D_eink_image_tag) {
 		usb_comm_EinkImage *eink_image = field->pData;
 		eink_image->bits.funcs.decode = read_bytes_field;
 	}
+	if (field->tag == usb_comm_MessageH2D_eink_frame_tag) {
+		usb_comm_EinkFrame *eink_frame = field->pData;
+		eink_frame->bits.funcs.decode = read_bytes_field;
+	}
+#endif
+#if defined(CONFIG_HW75_EINK_MODES)
+	if (field->tag == usb_comm_MessageH2D_eink_mode_config_tag) {
+		usb_comm_EinkModeConfig *cfg = field->pData;
+		usb_comm_eink_mode_prepare_decode(cfg);
+	}
+#endif
+#if defined(CONFIG_HW75_TOUCHBAR)
+	if (field->tag == usb_comm_MessageH2D_touchbar_config_tag) {
+		usb_comm_TouchbarConfig *cfg = field->pData;
+		usb_comm_touchbar_prepare_decode(cfg);
+	}
+#endif
+#if defined(CONFIG_HW75_FUNCTION_SLOT)
+	if (field->tag == usb_comm_MessageH2D_function_slot_config_tag) {
+		usb_comm_FunctionSlotConfig *cfg = field->pData;
+		usb_comm_function_slot_prepare_decode(cfg);
+	}
+#endif
 	return true;
 }
-#endif
 
 static void usb_comm_handle_message()
 {
@@ -74,46 +160,45 @@ static void usb_comm_handle_message()
 
 	pb_istream_t h2d_stream = pb_istream_from_buffer(usb_rx_buf, usb_rx_len);
 	pb_ostream_t d2h_stream = pb_ostream_from_buffer(usb_tx_buf, sizeof(usb_tx_buf));
+	usb_comm_MessageH2D *h2d = &usb_h2d_msg;
+	usb_comm_MessageD2H *d2h = &usb_d2h_msg;
 
-	usb_comm_MessageH2D h2d = usb_comm_MessageH2D_init_zero;
-	usb_comm_MessageD2H d2h = usb_comm_MessageD2H_init_zero;
+	*h2d = (usb_comm_MessageH2D)usb_comm_MessageH2D_init_zero;
+	*d2h = (usb_comm_MessageD2H)usb_comm_MessageD2H_init_zero;
 
-#if CONFIG_HW75_USB_COMM_MAX_BYTES_FIELD_SIZE
-	h2d.cb_payload.funcs.decode = h2d_callback;
-#endif
+	h2d->cb_payload.funcs.decode = h2d_callback;
 
-	if (!pb_decode_delimited(&h2d_stream, usb_comm_MessageH2D_fields, &h2d)) {
+	if (!pb_decode_delimited(&h2d_stream, usb_comm_MessageH2D_fields, h2d)) {
 		LOG_ERR("Failed decoding h2d message: %s", h2d_stream.errmsg);
 		return;
 	}
 
-	LOG_DBG("req action: %d", h2d.action);
-	d2h.action = h2d.action;
-	d2h.which_payload = usb_comm_MessageD2H_nop_tag;
+	LOG_DBG("req action: %d", h2d->action);
+	d2h->action = h2d->action;
+	d2h->which_payload = usb_comm_MessageD2H_nop_tag;
+	usb_comm_log_stack_watermark((uint16_t)h2d->action, 1U);
 
 	STRUCT_SECTION_FOREACH(usb_comm_handler_config, config)
 	{
-		if (config->action == h2d.action) {
-			if (config->handler(&h2d, &d2h, bytes_field, bytes_field_len)) {
-				d2h.which_payload = config->response_payload;
+		if (config->action == h2d->action) {
+			if (config->handler(h2d, d2h, bytes_field, bytes_field_len)) {
+				d2h->which_payload = config->response_payload;
 			}
 			break;
 		}
 	}
+	usb_comm_log_stack_watermark((uint16_t)h2d->action, 2U);
 
-	size_t d2h_size;
-	pb_get_encoded_size(&d2h_size, usb_comm_MessageD2H_fields, &d2h);
-	if (d2h_size > sizeof(usb_tx_buf)) {
-		LOG_ERR("The size of response for action %d is %d, exceeds max tx buf size %d",
-			h2d.action, d2h_size, sizeof(usb_tx_buf));
-	}
-
-	if (!pb_encode_delimited(&d2h_stream, usb_comm_MessageD2H_fields, &d2h)) {
+	if (!pb_encode_delimited(&d2h_stream, usb_comm_MessageD2H_fields, d2h)) {
 		LOG_ERR("Failed encoding d2h message: %s", d2h_stream.errmsg);
 		return;
 	}
+	usb_comm_log_stack_watermark((uint16_t)h2d->action, 3U);
 
-	usb_comm_hid_send(usb_tx_buf, d2h_stream.bytes_written);
+	int send_ret = usb_comm_hid_send(usb_tx_buf, d2h_stream.bytes_written);
+	if (send_ret != 0) {
+		LOG_ERR("Failed sending response for action %d: %d", d2h->action, send_ret);
+	}
 }
 
 static void usb_comm_handle_packet(uint8_t *data, uint32_t len)

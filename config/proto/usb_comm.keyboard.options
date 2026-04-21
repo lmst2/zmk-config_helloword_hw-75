@@ -1,0 +1,52 @@
+# Copyright (c) 2026
+# SPDX-License-Identifier: MIT
+#
+# Nanopb options for the keyboard firmware.
+#
+# Part 1: drop dynamic-only oneof payloads entirely so MessageH2D/MessageD2H
+# never reserve union space for messages the keyboard cannot handle. The
+# .proto file itself is untouched: host tooling (protobufjs) keeps seeing
+# the full schema.
+#
+# Part 2: turn every large nested field inside the keyboard-side messages
+# (TouchbarConfig, FunctionSlotConfig/Caps/Events) into pb_callback_t (8 B)
+# instead of inlining the child struct. This shrinks the MessageH2D/D2H
+# oneof max-member from ~340 B (TouchbarConfig) down to ~80 B, which frees
+# the ~248 B of runtime stack margin the UART keepalive link needs.
+
+# ===== Part 1: dynamic-only payloads =====
+usb.comm.MessageH2D.knob_config      type:FT_IGNORE
+usb.comm.MessageH2D.knob_pref        type:FT_IGNORE
+usb.comm.MessageH2D.eink_image       type:FT_IGNORE
+usb.comm.MessageH2D.eink_mode_config type:FT_IGNORE
+usb.comm.MessageH2D.eink_active      type:FT_IGNORE
+usb.comm.MessageH2D.eink_frame       type:FT_IGNORE
+usb.comm.MessageH2D.eink_clock       type:FT_IGNORE
+usb.comm.MessageH2D.eink_weather     type:FT_IGNORE
+usb.comm.MessageH2D.knob_calibration type:FT_IGNORE
+
+usb.comm.MessageD2H.motor_state       type:FT_IGNORE
+usb.comm.MessageD2H.knob_config       type:FT_IGNORE
+usb.comm.MessageD2H.knob_pref         type:FT_IGNORE
+usb.comm.MessageD2H.eink_image        type:FT_IGNORE
+usb.comm.MessageD2H.eink_mode_config  type:FT_IGNORE
+usb.comm.MessageD2H.knob_calibration  type:FT_IGNORE
+
+# ===== Part 2: shrink big keyboard-side payloads via per-field callback =====
+
+# TouchbarConfig nested sub-messages (were inlined at ~52 B / ~16 B each)
+usb.comm.TouchbarConfig.pan               type:FT_CALLBACK
+usb.comm.TouchbarConfig.app_switch        type:FT_CALLBACK
+usb.comm.TouchbarConfig.desktop_switch    type:FT_CALLBACK
+usb.comm.TouchbarConfig.pan_indicator     type:FT_CALLBACK
+usb.comm.TouchbarConfig.app_indicator     type:FT_CALLBACK
+usb.comm.TouchbarConfig.desktop_indicator type:FT_CALLBACK
+
+# TouchbarConfig repeated uint32 segment masks (were uint32[6] × 2 = 48 B)
+usb.comm.TouchbarConfig.segment_touch_masks type:FT_CALLBACK
+usb.comm.TouchbarConfig.segment_entry_masks type:FT_CALLBACK
+
+# Function slot repeated fields (macro steps, event list, HID preset ids)
+usb.comm.FunctionSlotConfig.macro_steps_packed  type:FT_CALLBACK
+usb.comm.FunctionSlotEvents.events              type:FT_CALLBACK
+usb.comm.FunctionSlotCaps.supported_hid_presets type:FT_CALLBACK
