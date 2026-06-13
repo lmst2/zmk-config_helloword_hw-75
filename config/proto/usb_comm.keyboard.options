@@ -24,6 +24,8 @@ usb.comm.MessageH2D.eink_frame       type:FT_IGNORE
 usb.comm.MessageH2D.eink_clock       type:FT_IGNORE
 usb.comm.MessageH2D.eink_weather     type:FT_IGNORE
 usb.comm.MessageH2D.knob_calibration type:FT_IGNORE
+usb.comm.MessageH2D.knob_pulse       type:FT_IGNORE
+usb.comm.MessageH2D.knob_detents     type:FT_IGNORE
 
 usb.comm.MessageD2H.motor_state       type:FT_IGNORE
 usb.comm.MessageD2H.knob_config       type:FT_IGNORE

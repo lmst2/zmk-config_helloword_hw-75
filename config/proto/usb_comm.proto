@@ -40,6 +40,8 @@ enum Action {
 	EINK_PUSH_WEATHER = 27;
 	KNOB_GET_CALIBRATION = 28;
 	KNOB_SET_CALIBRATION = 29;
+	KNOB_PULSE = 30;
+	KNOB_SET_DETENTS = 31;
 }
 
 message MessageH2D
@@ -67,6 +69,8 @@ message MessageH2D
 		EinkClock eink_clock = 17;
 		EinkWeather eink_weather = 18;
 		KnobCalibration knob_calibration = 19;
+		KnobPulse knob_pulse = 20;
+		KnobDetents knob_detents = 21;
 	}
 }
 
@@ -424,6 +428,21 @@ message KnobConfig
 		optional uint32 ppr = 5;
 		optional float torque_limit = 6;
 	}
+}
+
+message KnobPulse
+{
+	optional uint32 strength = 1;     // 0..100 firmness; 0/absent = medium default
+	optional uint32 count = 2;        // number of bumps; absent = 1
+	optional uint32 interval_ms = 3;  // gap between bumps; absent = ~60ms
+}
+
+message KnobDetents
+{
+	required uint32 count = 1;        // detents around the dial (>=1)
+	optional uint32 strength = 2;     // 0..100 detent firmness
+	optional bool endstops = 3;       // hard walls at first/last detent
+	optional bool wrap = 4;           // wrap past the ends instead of stopping
 }
 
 message RgbControl

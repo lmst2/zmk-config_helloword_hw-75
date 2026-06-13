@@ -11,6 +11,12 @@ enum Action {
 	NOP = 0;
 	PING = 1;
 	FN_STATE_CHANGED = 2;
+	LAYER_INDEX = 3;
+	CAPS_TOGGLED = 4;
+	TOUCHBAR_GESTURE = 5;
+	TOUCHBAR_MODE = 6;
+	ACTIVITY_HINT = 7;
+	SLOT_FIRED = 8;
 }
 
 message MessageK2D
@@ -20,6 +26,12 @@ message MessageK2D
 	{
 		Nop nop = 2;
 		FnState fn_state = 3;
+		LayerIndex layer_index = 4;
+		CapsToggled caps_toggled = 5;
+		TouchbarGesture touchbar_gesture = 6;
+		TouchbarMode touchbar_mode = 7;
+		ActivityHint activity_hint = 8;
+		SlotFired slot_fired = 9;
 	}
 }
 
@@ -30,4 +42,36 @@ message Nop
 message FnState
 {
 	required bool pressed = 1;
+}
+
+message LayerIndex
+{
+	required uint32 index = 1;       // highest active keyboard layer
+}
+
+message CapsToggled
+{
+	required bool engaged = 1;       // local Caps Lock guess (no host LED state in this ZMK fork)
+}
+
+message TouchbarGesture
+{
+	required uint32 verb = 1;        // 0 swipe_l, 1 swipe_r, 2 tap, 3 long
+}
+
+message TouchbarMode
+{
+	required uint32 mode = 1;        // 0 PAN, 1 APP_SWITCH, 2 DESKTOP_SWITCH
+}
+
+message ActivityHint
+{
+	required uint32 state = 1;       // 0 active, 1 idle, 2 sleep
+	optional uint32 intensity = 2;   // typing-intensity bucket 0..3
+}
+
+message SlotFired
+{
+	required uint32 slot_index = 1;
+	optional uint32 slot_type = 2;
 }
