@@ -26,17 +26,16 @@ static bool handle_eink_set_image(const usb_comm_MessageH2D *h2d, usb_comm_Messa
 
 	res->id = req->id;
 
-	/* Take over the panel: stop the mode loop (clock/weather minute tick) from
-	 * redrawing over this raw image until the host selects a mode again. */
-	eink_mode_hold_external();
-
 	bool partial = req->has_partial && req->partial;
 
 	if (req->has_x && req->has_y && req->has_width && req->has_height) {
+		/* Partial sub-rect update (legacy web path): draw directly. */
 		eink_update_region(bytes, bytes_len, req->x, req->y, req->width, req->height,
 				   partial);
 	} else {
-		eink_update(bytes, bytes_len, partial);
+		/* Full-frame push (now-playing card): becomes the active view so the
+		 * clock/weather mode won't redraw over it. EINK_SET_ACTIVE restores. */
+		eink_mode_show_external(bytes, bytes_len, partial);
 	}
 
 	return true;

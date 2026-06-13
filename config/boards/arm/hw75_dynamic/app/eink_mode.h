@@ -44,11 +44,12 @@ int eink_mode_set_active(uint8_t active_index);
 int eink_mode_cycle(int delta);
 
 /*
- * Suspend mode redraws so a host-pushed raw image (EINK_SET_IMAGE) stays on the
- * panel instead of being overwritten by the autonomous clock/weather tick.
- * Released by eink_mode_set_active() / eink_mode_set_config().
+ * Make a host-pushed full frame (EINK_SET_IMAGE) the active on-screen view. It
+ * stays put — the configured mode stops drawing, so the autonomous clock/weather
+ * tick can't overwrite it (the clock still advances internally). Released by
+ * eink_mode_set_active() / eink_mode_set_config(), which resume that mode.
  */
-void eink_mode_hold_external(void);
+int eink_mode_show_external(const uint8_t *bits, uint32_t bits_len, bool partial);
 
 int eink_mode_push_frame(uint8_t mode_id, uint8_t frame_index, const uint8_t *bits,
 			 uint32_t bits_len);

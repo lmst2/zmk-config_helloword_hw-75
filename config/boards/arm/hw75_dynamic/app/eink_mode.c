@@ -94,15 +94,16 @@ enum render_reason {
 static enum render_reason g_pending_reason;
 
 /*
- * External-image hold. When the host pushes a raw frame via EINK_SET_IMAGE
- * (e.g. the 中枢's live now-playing card), the mode loop must stop redrawing
- * the panel — otherwise the clock/weather minute tick (clock_tick_handler runs
- * autonomously off the MCU uptime, with no host) overwrites the pushed image
- * within 60 s. The hold gates panel writes in refresh_work_handler; the clock
- * keeps advancing in the background. EINK_SET_ACTIVE / SET_CONFIG clears it and
- * redraws the active mode.
+ * External-image view. A host-pushed full frame (EINK_SET_IMAGE, e.g. the 中枢
+ * now-playing card) becomes the active on-screen view — distinct from the
+ * configured modes, since the firmware can't render CJK text on-device. While
+ * it's the active view the configured mode does NOT draw, so the clock/weather
+ * minute tick (clock_tick_handler advances the time autonomously off the MCU
+ * uptime, even with no host) keeps ticking internally but never overwrites the
+ * image. Selecting any mode (EINK_SET_ACTIVE / SET_CONFIG) leaves this view and
+ * resumes that mode's rendering — the clock then redraws the current time.
  */
-static bool g_external_hold;
+static bool g_external_active;
 
 static uint32_t frame_key(uint8_t mode_id, uint8_t frame_index)
 {
@@ -344,8 +345,10 @@ static void refresh_work_handler(struct k_work *work)
 	enum render_reason reason = g_pending_reason;
 	g_pending_reason = RENDER_REASON_IDLE;
 
-	if (g_external_hold) {
-		/* A host-pushed raw image owns the panel; skip the mode redraw. */
+	if (g_external_active) {
+		/* The host image is the active view: re-show it instead of the
+		 * configured mode (robust against any stray refresh trigger). */
+		push_frame_buf_to_eink(false);
 		k_mutex_unlock(&g_lock);
 		return;
 	}
@@ -429,20 +432,28 @@ int eink_mode_set_config(const struct eink_mode_entry *modes, uint8_t count, uin
 		HW75_DIAG_EVENT_EINK_MODE_CHANGED,
 		hw75_diag_pack_u8x4(prev_id, new_id, prev_type, new_type), false, 0U);
 
-	g_external_hold = false;
+	g_external_active = false;
 	trigger_refresh(RENDER_REASON_CONFIG, K_NO_WAIT);
 	k_mutex_unlock(&g_lock);
 	return 0;
 }
 
-void eink_mode_hold_external(void)
+int eink_mode_show_external(const uint8_t *bits, uint32_t bits_len, bool partial)
 {
+	if (!bits || bits_len != EINK_FRAME_BYTES) {
+		return -EINVAL;
+	}
+
 	k_mutex_lock(&g_lock, K_FOREVER);
-	g_external_hold = true;
-	/* Drop any queued mode redraw so it can't fire between now and the raw
-	 * panel write the host is about to perform. */
+	/* Enter the external-image view. Stash the frame (so a later refresh can
+	 * re-show it), drop any queued mode redraw, and draw it now. The active
+	 * mode stops drawing until the host selects a mode again. */
+	g_external_active = true;
 	k_work_cancel_delayable(&g_refresh_work);
+	memcpy(g_frame_buf, bits, EINK_FRAME_BYTES);
+	int ret = push_frame_buf_to_eink(partial);
 	k_mutex_unlock(&g_lock);
+	return ret;
 }
 
 int eink_mode_set_active(uint8_t active_index)
@@ -476,8 +487,8 @@ int eink_mode_set_active(uint8_t active_index)
 				    false, 0U);
 	}
 
-	/* Selecting a mode releases any external-image hold and resumes drawing. */
-	g_external_hold = false;
+	/* Selecting a mode leaves the external-image view and resumes drawing. */
+	g_external_active = false;
 	trigger_refresh(RENDER_REASON_ACTIVE, K_NO_WAIT);
 	k_mutex_unlock(&g_lock);
 	return 0;
@@ -581,7 +592,9 @@ static void clock_tick_handler(struct k_work *work)
 
 	const struct eink_mode_entry *mode = active_entry();
 	bool is_clock = mode && mode->type == EINK_MODE_TYPE_CLOCK_WEATHER;
-	if (is_clock) {
+	/* Advance the time always, but only repaint when the clock is the active
+	 * view — never while a host image (now-playing card) is showing. */
+	if (is_clock && !g_external_active) {
 		trigger_refresh(RENDER_REASON_CLOCK, K_NO_WAIT);
 	}
 
