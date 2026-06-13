@@ -31,6 +31,8 @@ static struct {
 	{ uart_comm_Action_FN_STATE_CHANGED, handle_fn_state },
 	{ uart_comm_Action_LAYER_INDEX, handle_layer_index },
 	{ uart_comm_Action_CAPS_TOGGLED, handle_caps_toggled },
+	{ uart_comm_Action_ACTIVITY_HINT, handle_activity },
+	{ uart_comm_Action_TOUCHBAR_GESTURE, handle_touchbar_gesture },
 };
 
 static void uart_comm_handle(uint32_t len)

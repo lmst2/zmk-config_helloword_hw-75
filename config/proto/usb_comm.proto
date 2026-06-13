@@ -187,6 +187,7 @@ enum TouchbarMode {
 	TOUCHBAR_PAN = 0;
 	TOUCHBAR_APP_SWITCH = 1;
 	TOUCHBAR_DESKTOP_SWITCH = 2;
+	TOUCHBAR_REMOTE = 3;
 }
 
 message TouchbarModeIndicator

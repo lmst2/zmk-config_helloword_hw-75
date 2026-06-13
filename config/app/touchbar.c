@@ -56,8 +56,13 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #define TOUCHBAR_MODE_PAN HW75_TOUCHBAR_MODE_PAN
 #define TOUCHBAR_MODE_APP_SWITCH HW75_TOUCHBAR_MODE_APP_SWITCH
 #define TOUCHBAR_MODE_DESKTOP_SWITCH HW75_TOUCHBAR_MODE_DESKTOP_SWITCH
+#define TOUCHBAR_MODE_REMOTE HW75_TOUCHBAR_MODE_REMOTE
 #define TOUCHBAR_MODE_COUNT HW75_TOUCHBAR_MODE_COUNT
 #define TOUCHBAR_MODE_INDICATOR_DURATION_MS 1200U
+
+/* REMOTE-mode gesture classification thresholds. */
+#define TOUCHBAR_REMOTE_SWIPE_DISTANCE 96
+#define TOUCHBAR_REMOTE_LONG_MS 450U
 
 struct touchbar_session {
     enum hw75_touchbar_mode mode;
@@ -172,6 +177,13 @@ static struct hw75_touchbar_mode_indicator
             {
                 .red = 0x20,
                 .green = 0x70,
+                .blue = 0xE0,
+                .duration_ms = TOUCHBAR_MODE_INDICATOR_DURATION_MS,
+            },
+        [HW75_TOUCHBAR_MODE_REMOTE] =
+            {
+                .red = 0x90,
+                .green = 0x20,
                 .blue = 0xE0,
                 .duration_ms = TOUCHBAR_MODE_INDICATOR_DURATION_MS,
             },
@@ -862,6 +874,29 @@ static void touchbar_tick_pulses(int64_t timestamp) {
     touchbar_tick_pulse(&synthetic.right_arrow_pulse, timestamp);
 }
 
+/*
+ * REMOTE mode: instead of emitting HID, the strip becomes a remote for the
+ * dynamic module. The actual forwarding is provided (strongly) by the keyboard
+ * uart_comm; this weak default keeps the shared touchbar.c board-agnostic.
+ */
+__weak void hw75_touchbar_remote_gesture(uint8_t verb) { ARG_UNUSED(verb); }
+
+static void touchbar_finalize_remote_gesture(void) {
+    int16_t disp = (int16_t)(touchbar.current_position - touchbar.anchor_position);
+    uint32_t dur = touchbar.last_touch_ms - touchbar.touch_start_ms;
+    uint8_t verb;
+
+    if (touchbar_abs16(disp) >= TOUCHBAR_REMOTE_SWIPE_DISTANCE) {
+        verb = disp > 0 ? HW75_TOUCHBAR_GESTURE_SWIPE_R : HW75_TOUCHBAR_GESTURE_SWIPE_L;
+    } else if (dur >= TOUCHBAR_REMOTE_LONG_MS) {
+        verb = HW75_TOUCHBAR_GESTURE_LONG;
+    } else {
+        verb = HW75_TOUCHBAR_GESTURE_TAP;
+    }
+
+    hw75_touchbar_remote_gesture(verb);
+}
+
 static void touchbar_process(uint8_t touch_state, uint32_t now_ms, int64_t timestamp) {
     uint8_t active_segment = TOUCHBAR_INVALID_SEGMENT;
     uint8_t active_touch_count = 0U;
@@ -919,6 +954,8 @@ static void touchbar_process(uint8_t touch_state, uint32_t now_ms, int64_t times
 
         if (touchbar.mode == TOUCHBAR_MODE_DESKTOP_SWITCH) {
             touchbar_finalize_desktop_gesture(timestamp);
+        } else if (touchbar.mode == TOUCHBAR_MODE_REMOTE) {
+            touchbar_finalize_remote_gesture();
         }
 
         touchbar_apply_holds(timestamp);

@@ -58,6 +58,10 @@ static const struct device *motor = DEVICE_DT_GET(MOTOR_NODE);
 
 static bool motor_demo = false;
 
+/* Keep the knob enabled while the keyboard reports activity over UART, even if
+ * the dynamic module's own input (the knob) has gone idle (see F2c). */
+static bool knob_external_active = false;
+
 static struct knob_pref knob_prefs[KEYMAP_LAYERS_NUM];
 
 static struct k_work_delayable knob_enable_report_work;
@@ -171,6 +175,20 @@ void knob_app_set_demo(bool demo)
 		.demo = demo,
 		.calibration = KNOB_CALIBRATE_OK,
 	}));
+}
+
+void knob_app_set_external_active(bool active)
+{
+	if (!knob || !motor) {
+		return;
+	}
+	if (!motor_is_calibrated(motor) || motor_demo) {
+		return;
+	}
+
+	knob_external_active = active;
+	bool local = zmk_activity_get_state() == ZMK_ACTIVITY_ACTIVE;
+	knob_set_enable(knob, local || knob_external_active);
 }
 
 #ifdef CONFIG_SETTINGS
@@ -401,7 +419,7 @@ static int knob_app_event_listener(const zmk_event_t *eh)
 	if (as_zmk_activity_state_changed(eh)) {
 		bool active = zmk_activity_get_state() == ZMK_ACTIVITY_ACTIVE;
 
-		knob_set_enable(knob, active);
+		knob_set_enable(knob, active || knob_external_active);
 
 		ZMK_EVENT_RAISE(new_app_knob_state_changed((struct app_knob_state_changed){
 			.enable = active,

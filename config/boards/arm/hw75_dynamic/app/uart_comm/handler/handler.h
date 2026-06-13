@@ -12,3 +12,5 @@ typedef bool (*uart_comm_handler_t)(const uart_comm_MessageK2D *k2d);
 bool handle_fn_state(const uart_comm_MessageK2D *k2d);
 bool handle_layer_index(const uart_comm_MessageK2D *k2d);
 bool handle_caps_toggled(const uart_comm_MessageK2D *k2d);
+bool handle_activity(const uart_comm_MessageK2D *k2d);
+bool handle_touchbar_gesture(const uart_comm_MessageK2D *k2d);

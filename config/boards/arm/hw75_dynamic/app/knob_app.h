@@ -27,3 +27,7 @@ void knob_app_reset_pref(uint8_t layer_id);
 
 int knob_app_set_calibration(float zero_offset, int direction);
 int knob_app_recalibrate_auto(void);
+
+/* Keep the knob enabled while an external source (the keyboard, over UART)
+ * reports activity, even if the dynamic module's own input has gone idle. */
+void knob_app_set_external_active(bool active);

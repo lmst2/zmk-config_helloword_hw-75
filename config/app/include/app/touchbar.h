@@ -15,12 +15,21 @@ extern "C" {
 #endif
 
 #define HW75_TOUCHBAR_MAX_SEGMENT_COUNT HW75_TOUCHBAR_CHANNEL_COUNT
-#define HW75_TOUCHBAR_MODE_COUNT 3U
+#define HW75_TOUCHBAR_MODE_COUNT 4U
 
 enum hw75_touchbar_mode {
 	HW75_TOUCHBAR_MODE_PAN = 0,
 	HW75_TOUCHBAR_MODE_APP_SWITCH = 1,
 	HW75_TOUCHBAR_MODE_DESKTOP_SWITCH = 2,
+	/* Local remote: stop emitting HID; forward gestures to the dynamic over UART. */
+	HW75_TOUCHBAR_MODE_REMOTE = 3,
+};
+
+enum hw75_touchbar_gesture {
+	HW75_TOUCHBAR_GESTURE_SWIPE_L = 0,
+	HW75_TOUCHBAR_GESTURE_SWIPE_R = 1,
+	HW75_TOUCHBAR_GESTURE_TAP = 2,
+	HW75_TOUCHBAR_GESTURE_LONG = 3,
 };
 
 struct hw75_touchbar_mode_indicator {
@@ -79,6 +88,14 @@ int touchbar_set_mode(enum hw75_touchbar_mode mode);
 enum hw75_touchbar_mode touchbar_get_mode(void);
 int touchbar_get_config_view(struct hw75_touchbar_config_view *view);
 int touchbar_set_config_view(const struct hw75_touchbar_config_view *view);
+
+/*
+ * Called on gesture completion while the TouchBar is in REMOTE mode (verb is an
+ * enum hw75_touchbar_gesture). Weakly defined as a no-op in touchbar.c; the
+ * keyboard's uart_comm provides the real implementation, which forwards the
+ * gesture to the dynamic module over UART.
+ */
+void hw75_touchbar_remote_gesture(uint8_t verb);
 
 #ifdef __cplusplus
 }
