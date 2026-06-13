@@ -17,6 +17,9 @@ zephyr_library_sources_ifdef(CONFIG_HW75_TOUCHBAR behaviors/behavior_touchbar_mo
 zephyr_library_sources_ifdef(CONFIG_HW75_FUNCTION_SLOT behaviors/behavior_function_slot.c)
 zephyr_library_sources_ifdef(CONFIG_HW75_EINK_MODES behaviors/behavior_eink_mode_cycle.c)
 zephyr_library_include_directories_ifdef(CONFIG_HW75_EINK_MODES ${BOARD_DIR}/app)
+# Knob/keys -> keyboard RGB over D2K. HW75_KNOB is dynamic-only (the keyboard has
+# no knob), so this never builds the D2K sender call into the keyboard image.
+zephyr_library_sources_ifdef(CONFIG_HW75_KNOB behaviors/behavior_rgb_send.c)
 
 add_subdirectory_ifdef(CONFIG_HW75_USB_COMM usb_comm)
 

@@ -7,6 +7,7 @@
 #include <behaviors/lvgl_key_press.dtsi>
 #include <behaviors/sensor_rotate_mouse_wheel.dtsi>
 #include <behaviors/eink_mode_cycle.dtsi>
+#include <behaviors/rgb_send.dtsi>
 #include <dt-bindings/zmk/keys.h>
 #include <dt-bindings/zmk/rgb.h>
 #include <dt-bindings/zmk/lvgl.h>
@@ -56,6 +57,42 @@
 			flavor = "tap-preferred";
 			bindings = <&ekcyc>, <&lvkp>;
 		};
+
+		/*
+		 * Knob -> keyboard underglow over D2K. Each rotate step sends one
+		 * relative ±1 opcode (see uart_comm.proto RgbCmd). The keyboard is
+		 * stateless; all the UI lives here on the dynamic module.
+		 */
+		rgb_rot_bri: rgb_rot_bri {
+			compatible = "zmk,behavior-sensor-rotate";
+			label = "RGB_ROT_BRI";
+			#sensor-binding-cells = <0>;
+			bindings = <&rgb_send 2>, <&rgb_send 3>;
+		};
+		rgb_rot_hue: rgb_rot_hue {
+			compatible = "zmk,behavior-sensor-rotate";
+			label = "RGB_ROT_HUE";
+			#sensor-binding-cells = <0>;
+			bindings = <&rgb_send 6>, <&rgb_send 7>;
+		};
+		rgb_rot_sat: rgb_rot_sat {
+			compatible = "zmk,behavior-sensor-rotate";
+			label = "RGB_ROT_SAT";
+			#sensor-binding-cells = <0>;
+			bindings = <&rgb_send 8>, <&rgb_send 9>;
+		};
+		rgb_rot_spd: rgb_rot_spd {
+			compatible = "zmk,behavior-sensor-rotate";
+			label = "RGB_ROT_SPD";
+			#sensor-binding-cells = <0>;
+			bindings = <&rgb_send 10>, <&rgb_send 11>;
+		};
+		rgb_rot_eff: rgb_rot_eff {
+			compatible = "zmk,behavior-sensor-rotate";
+			label = "RGB_ROT_EFF";
+			#sensor-binding-cells = <0>;
+			bindings = <&rgb_send 4>, <&rgb_send 5>;
+		};
 	};
 
 	keymap {
@@ -95,6 +132,46 @@
 			icon = [EF 86 9C];
 			bindings = <&trans &trans>;
 			sensor-bindings = <&inc_dec_kp LEFT RIGHT>;
+		};
+
+		/*
+		 * On-device keyboard-RGB control. Knob rotation adjusts the parameter;
+		 * the two keys navigate the carousel (short) / cycle E-Ink mode (long),
+		 * same as the other layers. No PC needed.
+		 */
+		rgb_brightness {
+			label = "亮度";
+			icon = [EF 83 AB];
+			bindings = <&ek_ht (-1) LV_KEY_PREV &ek_ht 1 LV_KEY_NEXT>;
+			sensor-bindings = <&rgb_rot_bri>;
+		};
+
+		rgb_hue {
+			label = "色相";
+			icon = [EF 81 83];
+			bindings = <&ek_ht (-1) LV_KEY_PREV &ek_ht 1 LV_KEY_NEXT>;
+			sensor-bindings = <&rgb_rot_hue>;
+		};
+
+		rgb_saturation {
+			label = "饱和";
+			icon = [EF 81 82];
+			bindings = <&ek_ht (-1) LV_KEY_PREV &ek_ht 1 LV_KEY_NEXT>;
+			sensor-bindings = <&rgb_rot_sat>;
+		};
+
+		rgb_speed {
+			label = "速度";
+			icon = [EF 83 A7];
+			bindings = <&ek_ht (-1) LV_KEY_PREV &ek_ht 1 LV_KEY_NEXT>;
+			sensor-bindings = <&rgb_rot_spd>;
+		};
+
+		rgb_effect {
+			label = "效果";
+			icon = [EF 83 90];
+			bindings = <&ek_ht (-1) LV_KEY_PREV &ek_ht 1 LV_KEY_NEXT>;
+			sensor-bindings = <&rgb_rot_eff>;
 		};
 	};
 };
