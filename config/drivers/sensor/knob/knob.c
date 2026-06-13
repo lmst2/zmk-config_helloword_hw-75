@@ -18,6 +18,16 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(knob, CONFIG_ZMK_LOG_LEVEL);
 
+/* One-shot haptic pulse tuning (see knob_pulse). */
+#define KNOB_PULSE_MIN_RAD     0.06f
+#define KNOB_PULSE_MAX_RAD     0.30f
+#define KNOB_PULSE_PHASE_TICKS 60U /* ~12 ms per half-swing at the 200 us tick */
+
+/* Host-defined detent map (see knob_set_detents). */
+#define KNOB_DETENT_PPR        24    /* notch density when walls span the count */
+#define KNOB_DETENT_MIN_TORQUE 1.5f  /* volts */
+#define KNOB_DETENT_MAX_TORQUE 6.0f
+
 struct knob_data {
 	int32_t delta;
 
@@ -42,6 +52,13 @@ struct knob_data {
 
 	bool encoder_report;
 	int encoder_ppr;
+
+	/* one-shot haptic pulse: transient ANGLE out-and-back overriding the profile */
+	float pulse_anchor;
+	float pulse_offset;
+	uint16_t pulse_phase_ticks;
+	uint8_t pulse_cycles;
+	bool pulse_out;
 };
 
 struct knob_config {
@@ -192,6 +209,60 @@ float knob_get_velocity(const struct device *dev)
 	return motor_get_estimate_velocity(config->motor);
 }
 
+void knob_pulse(const struct device *dev, uint8_t strength, uint8_t count)
+{
+	struct knob_data *data = dev->data;
+
+	if (data->mode == KNOB_DISABLE || data->profile == NULL) {
+		/* Motor is inactive; there is nothing to feel. */
+		return;
+	}
+
+	if (strength > 100U) {
+		strength = 100U;
+	}
+	if (count == 0U) {
+		count = 1U;
+	}
+
+	data->pulse_anchor = knob_get_position(dev);
+	data->pulse_offset = KNOB_PULSE_MIN_RAD +
+			     (KNOB_PULSE_MAX_RAD - KNOB_PULSE_MIN_RAD) * ((float)strength / 100.0f);
+	data->pulse_phase_ticks = KNOB_PULSE_PHASE_TICKS;
+	data->pulse_out = true;
+	data->pulse_cycles = count;
+}
+
+void knob_set_detents(const struct device *dev, uint8_t count, uint8_t strength, bool endstops)
+{
+	const struct knob_config *config = dev->config;
+
+	if (count < 1U) {
+		count = 1U;
+	}
+	if (strength > 100U) {
+		strength = 100U;
+	}
+
+	/* Notched feel comes from the encoder profile at a fixed comfortable density;
+	 * the requested count is realised as the reachable range between the walls. */
+	knob_set_mode(dev, KNOB_ENCODER);
+	knob_set_encoder_ppr(dev, KNOB_DETENT_PPR);
+
+	if (endstops) {
+		float spacing = PI2 / (float)KNOB_DETENT_PPR;
+		float anchor = knob_get_position(dev);
+		knob_set_position_limit(dev, anchor, anchor + (float)(count - 1U) * spacing);
+	} else {
+		knob_set_position_limit(dev, 0.0f, 0.0f);
+	}
+
+	motor_set_torque_limit(config->motor,
+			       KNOB_DETENT_MIN_TORQUE +
+				       (KNOB_DETENT_MAX_TORQUE - KNOB_DETENT_MIN_TORQUE) *
+					       ((float)strength / 100.0f));
+}
+
 static void knob_report_work_handler(struct k_work *work)
 {
 	struct knob_data *data = CONTAINER_OF(work, struct knob_data, report_work);
@@ -216,30 +287,49 @@ static void knob_thread(void *p1, void *p2, void *p3)
 
 	while (1) {
 		if (data->profile != NULL) {
-			limited = false;
-			if (data->position_min != data->position_max) {
-				p = knob_get_position(dev);
-				if (p > data->position_max) {
-					data->mc->mode = ANGLE;
-					data->mc->target = data->position_max;
-					limited = true;
-				} else if (p < data->position_min) {
-					data->mc->mode = ANGLE;
-					data->mc->target = data->position_min;
-					limited = true;
+			if (data->pulse_cycles > 0) {
+				/* Transient haptic bump: hold ANGLE at anchor +/- offset,
+				 * overriding the profile, then swing back. Out-and-back to
+				 * the same anchor keeps the profile continuous (no report). */
+				data->mc->mode = ANGLE;
+				data->mc->target = data->pulse_anchor +
+						   (data->pulse_out ? data->pulse_offset : 0.0f);
+				motor_tick(config->motor);
+				if (--data->pulse_phase_ticks == 0) {
+					data->pulse_phase_ticks = KNOB_PULSE_PHASE_TICKS;
+					if (data->pulse_out) {
+						data->pulse_out = false;
+					} else {
+						data->pulse_out = true;
+						data->pulse_cycles--;
+					}
 				}
-			}
-			if (!limited) {
-				knob_profile_tick(data->profile, data->mc);
-			}
+			} else {
+				limited = false;
+				if (data->position_min != data->position_max) {
+					p = knob_get_position(dev);
+					if (p > data->position_max) {
+						data->mc->mode = ANGLE;
+						data->mc->target = data->position_max;
+						limited = true;
+					} else if (p < data->position_min) {
+						data->mc->mode = ANGLE;
+						data->mc->target = data->position_min;
+						limited = true;
+					}
+				}
+				if (!limited) {
+					knob_profile_tick(data->profile, data->mc);
+				}
 
-			motor_tick(config->motor);
+				motor_tick(config->motor);
 
-			data->delta = 0;
-			if (data->encoder_report &&
-			    knob_profile_report(data->profile, &data->delta) == 0 &&
-			    data->delta != 0) {
-				k_work_submit(&data->report_work);
+				data->delta = 0;
+				if (data->encoder_report &&
+				    knob_profile_report(data->profile, &data->delta) == 0 &&
+				    data->delta != 0) {
+					k_work_submit(&data->report_work);
+				}
 			}
 		}
 

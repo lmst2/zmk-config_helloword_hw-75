@@ -266,3 +266,49 @@ static bool handle_knob_set_calibration(const usb_comm_MessageH2D *h2d, usb_comm
 
 USB_COMM_HANDLER_DEFINE(usb_comm_Action_KNOB_SET_CALIBRATION,
 			usb_comm_MessageD2H_knob_calibration_tag, handle_knob_set_calibration);
+
+static bool handle_knob_pulse(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *d2h,
+			      const void *bytes, uint32_t bytes_len)
+{
+	ARG_UNUSED(d2h);
+	ARG_UNUSED(bytes);
+	ARG_UNUSED(bytes_len);
+
+	const usb_comm_KnobPulse *req = &h2d->payload.knob_pulse;
+
+	if (!knob) {
+		return false;
+	}
+
+	uint8_t strength = req->has_strength ? (uint8_t)MIN(req->strength, 100U) : 50U;
+	uint8_t count = req->has_count ? (uint8_t)CLAMP(req->count, 1U, 10U) : 1U;
+	knob_pulse(knob, strength, count);
+
+	return true;
+}
+
+USB_COMM_HANDLER_DEFINE(usb_comm_Action_KNOB_PULSE, usb_comm_MessageD2H_nop_tag, handle_knob_pulse);
+
+static bool handle_knob_set_detents(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *d2h,
+				    const void *bytes, uint32_t bytes_len)
+{
+	ARG_UNUSED(d2h);
+	ARG_UNUSED(bytes);
+	ARG_UNUSED(bytes_len);
+
+	const usb_comm_KnobDetents *req = &h2d->payload.knob_detents;
+
+	if (!knob) {
+		return false;
+	}
+
+	uint8_t count = (uint8_t)CLAMP(req->count, 1U, 255U);
+	uint8_t strength = req->has_strength ? (uint8_t)MIN(req->strength, 100U) : 50U;
+	bool endstops = req->has_endstops && req->endstops;
+	knob_set_detents(knob, count, strength, endstops);
+
+	return true;
+}
+
+USB_COMM_HANDLER_DEFINE(usb_comm_Action_KNOB_SET_DETENTS, usb_comm_MessageD2H_nop_tag,
+			handle_knob_set_detents);

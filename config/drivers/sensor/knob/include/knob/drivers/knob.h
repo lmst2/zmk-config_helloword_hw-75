@@ -7,6 +7,7 @@
 #define KNOB_INCLUDE_DRIVERS_KNOB_H_
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <zephyr/device.h>
 
 /**
@@ -64,6 +65,28 @@ float knob_get_velocity(const struct device *dev);
 void knob_set_position_offset(const struct device *dev, float offset);
 
 float knob_get_position_offset(const struct device *dev);
+
+/**
+ * @brief Fire a one-shot haptic pulse: a brief transient ANGLE out-and-back
+ * "bump" felt in the fingertips, overriding the active profile for a few ticks
+ * and then resuming it. Net displacement is ~zero, so no spurious encoder
+ * report is generated. No-op while the knob is disabled (motor off).
+ *
+ * @param strength 0..100 nudge firmness (clamped).
+ * @param count    number of bumps (>=1).
+ */
+void knob_pulse(const struct device *dev, uint8_t strength, uint8_t count);
+
+/**
+ * @brief Reshape the dial into a host-defined detent map: @p count notches via
+ * the encoder profile, optionally walled by hard end-stops at both ends
+ * (Surface-Dial / list-picker feel).
+ *
+ * @param count    number of detents (>=1).
+ * @param strength 0..100 detent firmness (motor torque).
+ * @param endstops true = hard walls at the first/last detent.
+ */
+void knob_set_detents(const struct device *dev, uint8_t count, uint8_t strength, bool endstops);
 
 #ifdef __cplusplus
 }
