@@ -202,7 +202,7 @@ const server = http.createServer(async (req, res) => {
 
 const weather = new Weather({ keyboard, coreConfig });
 const clock = new Clock({ keyboard, coreConfig });
-const bus = new Bus({ httpServer: server, keyboard, coreConfig, weather });
+const bus = new Bus({ httpServer: server, keyboard, keyboardBoard, coreConfig, weather });
 
 /* Backfill the bus reference so broadcasters can reach websocket clients. */
 weather.bus = bus;
