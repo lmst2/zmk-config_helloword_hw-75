@@ -87,21 +87,47 @@ static void uart_comm_handle_d2k(const uart_comm_MessageD2K *d2k)
 {
 	if (d2k->action == uart_comm_ActionD2K_D2K_RGB &&
 	    d2k->which_payload == uart_comm_MessageD2K_rgb_tag) {
+		/*
+		 * RgbCmd.command is a flat opcode so the dynamic module can drive the
+		 * keyboard's underglow over D2K with zero new keyboard state. Each tick
+		 * is a relative ±1 (perfect for a knob); the dynamic owns the UI. Codes
+		 * map 1:1 to the existing zmk_rgb_underglow_* setters, so adding params
+		 * costs the keyboard only a case line (flash), no SRAM. Keep in sync
+		 * with the dynamic sender and uart_comm.proto's RgbCmd comment.
+		 */
 		switch (d2k->payload.rgb.command) {
-		case 1:
+		case 1: /* toggle on/off */
 			zmk_rgb_underglow_toggle();
 			break;
-		case 2:
+		case 2: /* brightness + */
 			zmk_rgb_underglow_change_brt(1);
 			break;
-		case 3:
+		case 3: /* brightness - */
 			zmk_rgb_underglow_change_brt(-1);
 			break;
-		case 4:
+		case 4: /* effect next */
 			zmk_rgb_underglow_cycle_effect(1);
 			break;
-		case 5:
+		case 5: /* effect prev */
 			zmk_rgb_underglow_cycle_effect(-1);
+			break;
+		case 6: /* hue + */
+			zmk_rgb_underglow_change_hue(1);
+			break;
+		case 7: /* hue - */
+			zmk_rgb_underglow_change_hue(-1);
+			break;
+		case 8: /* saturation + */
+			zmk_rgb_underglow_change_sat(1);
+			break;
+		case 9: /* saturation - */
+			zmk_rgb_underglow_change_sat(-1);
+			break;
+		case 10: /* speed + */
+			zmk_rgb_underglow_change_spd(1);
+			break;
+		case 11: /* speed - */
+			zmk_rgb_underglow_change_spd(-1);
 			break;
 		default:
 			break;
