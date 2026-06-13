@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { Keyboard } from './keyboard.mjs';
+import { Device } from './keyboard.mjs';
 import { Bus } from './bus.mjs';
 import { CoreConfig } from './coreConfig.mjs';
 import { Weather } from './weather.mjs';
@@ -108,7 +108,11 @@ await ensureProfileState();
 const coreConfig = new CoreConfig(CORE_CONFIG_PATH);
 await coreConfig.load();
 
-const keyboard = new Keyboard();
+/* The 中枢 owns a HID session to BOTH boards: the dynamic module (knob / e-ink,
+ * the primary for weather/clock pushes) and the keyboard board (touchbar /
+ * function slots / RGB). */
+const keyboard = new Device({ productHint: 'dynamic', name: 'dynamic' });
+const keyboardBoard = new Device({ productHint: 'keyboard', name: 'keyboard' });
 const foreground = new Foreground();
 foreground.on('change', (info) => {
   console.log(`[foreground] ${info.process} :: ${info.title}`);
@@ -130,6 +134,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, {
         version: HELPER_VERSION,
         keyboard: { connected: keyboard.isConnected(), path: keyboard.devicePath ?? null },
+        keyboardBoard: { connected: keyboardBoard.isConnected(), path: keyboardBoard.devicePath ?? null },
         foreground: foreground.snapshot(),
         config: coreConfig.snapshot(),
       });
@@ -193,6 +198,7 @@ server.listen(PORT, HOST, () => {
   console.log(`[hw75-helper] listening on http://${HOST}:${PORT}`);
   console.log(`[hw75-helper] WebSocket at ws://${HOST}:${PORT}/ws`);
   keyboard.start();
+  keyboardBoard.start();
   weather.start();
   clock.start();
   foreground.start();

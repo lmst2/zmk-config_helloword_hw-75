@@ -27,7 +27,7 @@ const RESCAN_INTERVAL_MS = 1000;
  */
 const TARGET_PRODUCT_HINT = 'dynamic';
 
-function matchesUsage(info) {
+function matchesUsage(info, productHint) {
   if (info.vendorId !== USB_VID || info.productId !== USB_PID) {
     return false;
   }
@@ -38,7 +38,7 @@ function matchesUsage(info) {
   if (!product) {
     return false;
   }
-  return product.includes(TARGET_PRODUCT_HINT);
+  return product.includes(productHint);
 }
 
 let enumerationLogged = false;
@@ -52,7 +52,7 @@ function logEnumerationOnce(devices) {
     return;
   }
   enumerationLogged = true;
-  console.log(`[keyboard] hw75 HID interfaces found: ${hw75.length}`);
+  console.log(`[hid] hw75 HID interfaces found: ${hw75.length}`);
   for (const d of hw75) {
     console.log(
       `  - product=${JSON.stringify(d.product)} usagePage=0x${(d.usagePage ?? 0).toString(16)} ` +
@@ -60,10 +60,10 @@ function logEnumerationOnce(devices) {
   }
 }
 
-function findDevicePath() {
+function findDevicePath(productHint) {
   const devices = HID.devices();
   logEnumerationOnce(devices);
-  const target = devices.find(matchesUsage);
+  const target = devices.find((info) => matchesUsage(info, productHint));
   return target?.path;
 }
 
@@ -85,9 +85,17 @@ function prefixSize(buf) {
   return undefined;
 }
 
-export class Keyboard extends EventEmitter {
-  constructor() {
+export class Device extends EventEmitter {
+  /*
+   * Both HW-75 boards share VID/PID and expose the usb_comm usage page, so we
+   * select by USB product string: productHint 'dynamic' -> the knob/e-ink module,
+   * 'keyboard' -> the 82-key board (touchbar / function slots / RGB). The 中枢
+   * runs one Device per board so every connection goes through it.
+   */
+  constructor({ productHint = TARGET_PRODUCT_HINT, name = 'dynamic' } = {}) {
     super();
+    this.productHint = productHint;
+    this.name = name;
     this.device = undefined;
     this.devicePath = undefined;
     this.rxBuf = Buffer.alloc(0);
@@ -124,7 +132,7 @@ export class Keyboard extends EventEmitter {
       return;
     }
 
-    const path = findDevicePath();
+    const path = findDevicePath(this.productHint);
     if (!path) {
       this.scheduleRescan();
       return;
@@ -139,9 +147,9 @@ export class Keyboard extends EventEmitter {
       this.devicePath = path;
       this.rxBuf = Buffer.alloc(0);
       this.emit('status', { connected: true, path });
-      console.log(`[keyboard] connected: ${path}`);
+      console.log(`[${this.name}] connected: ${path}`);
     } catch (error) {
-      console.warn(`[keyboard] failed to open ${path}: ${error.message}`);
+      console.warn(`[${this.name}] failed to open ${path}: ${error.message}`);
       this.scheduleRescan();
     }
   }
@@ -170,7 +178,7 @@ export class Keyboard extends EventEmitter {
   }
 
   handleDeviceError(err) {
-    console.warn(`[keyboard] HID error: ${err.message}`);
+    console.warn(`[${this.name}] HID error: ${err.message}`);
     this.closeDevice();
     this.scheduleRescan();
   }
@@ -190,7 +198,7 @@ export class Keyboard extends EventEmitter {
     const reportIdOffset = data.length > HID_REPORT_SIZE ? 1 : 0;
     const len = data[reportIdOffset];
     if (len < 0 || len > PAYLOAD_PER_PACKET) {
-      console.warn(`[keyboard] invalid packet length: ${len}`);
+      console.warn(`[${this.name}] invalid packet length: ${len}`);
       this.rxBuf = Buffer.alloc(0);
       return;
     }
@@ -199,7 +207,7 @@ export class Keyboard extends EventEmitter {
     this.rxBuf = Buffer.concat([this.rxBuf, payload]);
 
     if (this.rxBuf.length > RX_QUEUE_LIMIT) {
-      console.warn(`[keyboard] rx queue overflow (${this.rxBuf.length}), dropping`);
+      console.warn(`[${this.name}] rx queue overflow (${this.rxBuf.length}), dropping`);
       this.rxBuf = Buffer.alloc(0);
       return;
     }
@@ -216,7 +224,7 @@ export class Keyboard extends EventEmitter {
     try {
       message = UsbComm.MessageD2H.decodeDelimited(messageBytes);
     } catch (error) {
-      console.warn(`[keyboard] decode failed: ${error.message}`);
+      console.warn(`[${this.name}] decode failed: ${error.message}`);
       return;
     }
 
