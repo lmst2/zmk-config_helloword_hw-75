@@ -1,0 +1,298 @@
+syntax = "proto2";
+
+package UsbComm;
+
+enum Action {
+  NOP = 0;
+  VERSION = 1;
+  MOTOR_GET_STATE = 2;
+  KNOB_GET_CONFIG = 3;
+  KNOB_SET_CONFIG = 4;
+  KNOB_UPDATE_PREF = 9;
+  RGB_CONTROL = 5;
+  RGB_GET_STATE = 6;
+  RGB_SET_STATE = 8;
+  RGB_GET_INDICATOR = 10;
+  RGB_SET_INDICATOR = 11;
+  EINK_SET_IMAGE = 7;
+  LOG_GET_STATE = 12;
+  LOG_GET_EVENTS = 13;
+  LOG_SET_CONFIG = 14;
+  LOG_CLEAR = 15;
+}
+
+message MessageH2D {
+  required Action action = 1;
+  oneof payload {
+    Nop nop = 2;
+    KnobConfig knob_config = 3;
+    KnobConfig.Pref knob_pref = 6;
+    RgbControl rgb_control = 4;
+    RgbState rgb_state = 7;
+    RgbIndicator rgb_indicator = 8;
+    EinkImage eink_image = 5;
+    LogRequest log_request = 9;
+    LogConfig log_config = 10;
+  }
+}
+
+message MessageD2H {
+  required Action action = 1;
+  oneof payload {
+    Nop nop = 2;
+    Version version = 3;
+    MotorState motor_state = 4;
+    KnobConfig knob_config = 5;
+    KnobConfig.Pref knob_pref = 8;
+    RgbState rgb_state = 6;
+    RgbIndicator rgb_indicator = 9;
+    EinkImage eink_image = 7;
+    LogState log_state = 10;
+    LogEvents log_events = 11;
+  }
+}
+
+message Nop {}
+
+message Version {
+  required string zephyr_version = 1;
+  required string zmk_version = 2;
+  required string app_version = 3;
+  optional Features features = 4;
+
+  message Features {
+    optional bool rgb = 1;
+    optional bool rgb_full_control = 5;
+    optional bool rgb_indicator = 6;
+    optional bool eink = 2;
+    optional bool knob = 3;
+    optional bool knob_prefs = 4;
+    optional bool knob_profile_switch = 7;
+    optional bool knob_spring_report = 8;
+    optional uint32 rgb_effect_count = 9;
+    optional uint32 rgb_effect_mask = 10;
+    optional bool debug_log = 11;
+  }
+}
+
+enum LogLevel {
+  ERROR = 0;
+  WARN = 1;
+  INFO = 2;
+  DEBUG = 3;
+  TRACE = 4;
+}
+
+enum LogModule {
+  SYSTEM = 0;
+  USB_COMM = 1;
+  KSCAN = 2;
+  TOUCHBAR = 3;
+  BEHAVIOR = 4;
+  HID = 5;
+  RGB = 6;
+  INDICATOR = 7;
+  SETTINGS = 8;
+}
+
+enum LogEventId {
+  LOG_EVENT_SYSTEM_INIT = 1;
+  LOG_EVENT_SYSTEM_LOG_CONFIG = 2;
+  LOG_EVENT_USB_INIT = 10;
+  LOG_EVENT_USB_REQUEST = 11;
+  LOG_EVENT_USB_RX_OVERFLOW = 12;
+  LOG_EVENT_USB_PACKET_HEADER_INVALID = 13;
+  LOG_EVENT_USB_DECODE_FAIL = 14;
+  LOG_EVENT_USB_ENCODE_FAIL = 15;
+  LOG_EVENT_USB_RESPONSE_LARGE = 16;
+  LOG_EVENT_USB_BYTES_OVERFLOW = 17;
+  LOG_EVENT_USB_BYTES_DECODE_FAIL = 18;
+  LOG_EVENT_USB_TX_WAIT_TIMEOUT = 19;
+  LOG_EVENT_USB_TX_WRITE_FAIL = 20;
+  LOG_EVENT_USB_TX_SHORT_WRITE = 21;
+  LOG_EVENT_KSCAN_TOUCH_MAP = 30;
+  LOG_EVENT_KSCAN_TOUCH_STATE = 31;
+  LOG_EVENT_BEHAVIOR_TOUCHBAR_MODE = 40;
+  LOG_EVENT_HID_INIT = 50;
+  LOG_EVENT_HID_INIT_FAIL = 51;
+  LOG_EVENT_HID_WHEEL_SEND = 52;
+  LOG_EVENT_HID_WHEEL_SEND_FAIL = 53;
+  LOG_EVENT_RGB_CONTROL = 60;
+  LOG_EVENT_RGB_SET_STATE = 61;
+  LOG_EVENT_RGB_SET_INDICATOR = 62;
+  LOG_EVENT_INDICATOR_INIT = 70;
+  LOG_EVENT_INDICATOR_ENABLE = 71;
+  LOG_EVENT_INDICATOR_BRIGHTNESS_ACTIVE = 72;
+  LOG_EVENT_INDICATOR_BRIGHTNESS_INACTIVE = 73;
+  LOG_EVENT_TOUCHBAR_INIT = 80;
+  LOG_EVENT_TOUCHBAR_INIT_FAIL = 81;
+  LOG_EVENT_TOUCHBAR_POLL_ERROR = 82;
+  LOG_EVENT_TOUCHBAR_POLL_RECOVERED = 83;
+  LOG_EVENT_TOUCHBAR_MODE_CYCLE = 84;
+  LOG_EVENT_TOUCHBAR_TOUCH_START = 85;
+  LOG_EVENT_TOUCHBAR_ACTIVATION_WAIT = 86;
+  LOG_EVENT_TOUCHBAR_GESTURE_ACTIVE = 87;
+  LOG_EVENT_TOUCHBAR_PAN_WHEEL = 88;
+  LOG_EVENT_TOUCHBAR_APP_SWITCH_STEP = 89;
+  LOG_EVENT_TOUCHBAR_DESKTOP_SWITCH_STEP = 90;
+  LOG_EVENT_TOUCHBAR_EDGE_HOLD_ARM = 91;
+  LOG_EVENT_TOUCHBAR_DESKTOP_EDGE_ARM = 92;
+  LOG_EVENT_TOUCHBAR_APP_RELEASE_GUARD = 93;
+  LOG_EVENT_TOUCHBAR_DESKTOP_FINALIZE = 94;
+  LOG_EVENT_TOUCHBAR_DESKTOP_HOLD_WAIT = 95;
+  LOG_EVENT_TOUCHBAR_DESKTOP_SEEK = 96;
+  LOG_EVENT_TOUCHBAR_RELEASE_PENDING = 97;
+  LOG_EVENT_TOUCHBAR_RELEASE_GRACE = 98;
+  LOG_EVENT_TOUCHBAR_TOUCH_END = 99;
+  LOG_EVENT_TOUCHBAR_APP_RELEASE_JITTER = 100;
+}
+
+message LogConfig {
+  optional LogLevel min_level = 1;
+  optional uint32 enabled_modules_mask = 2;
+}
+
+message LogRequest {
+  optional uint32 after_seq = 1;
+  optional uint32 max_count = 2;
+}
+
+message LogEvent {
+  required uint32 seq = 1;
+  required uint32 uptime_ms = 2;
+  required LogLevel level = 3;
+  required LogModule module = 4;
+  required LogEventId event_id = 5;
+  required uint32 data0 = 6;
+  optional uint32 data1 = 7;
+  optional uint32 trace_id = 8;
+  optional uint32 repeat_count = 9;
+}
+
+message LogSnapshot {
+  required LogModule module = 1;
+  optional uint32 updated_ms = 2;
+  required uint32 state0 = 3;
+  required uint32 state1 = 4;
+  required uint32 state2 = 5;
+}
+
+message LogState {
+  optional LogConfig config = 1;
+  optional uint32 dropped_count = 2;
+  optional uint32 oldest_seq = 3;
+  optional uint32 newest_seq = 4;
+  repeated LogSnapshot snapshots = 5;
+  repeated LogEvent boot_events = 6;
+}
+
+message LogEvents {
+  repeated LogEvent events = 1;
+  optional uint32 dropped_count = 2;
+  optional uint32 oldest_seq = 3;
+  optional uint32 newest_seq = 4;
+}
+
+message MotorState {
+  required uint32 timestamp = 1;
+  required ControlMode control_mode = 2;
+  required float current_angle = 3;
+  required float current_velocity = 4;
+  required float target_angle = 5;
+  required float target_velocity = 6;
+  required float target_voltage = 7;
+
+  enum ControlMode {
+    TORQUE = 0;
+    VELOCITY = 1;
+    ANGLE = 2;
+  }
+}
+
+message KnobConfig {
+  required bool demo = 1;
+  required Mode mode = 2;
+  repeated Pref prefs = 5;
+
+  enum Mode {
+    DISABLE = 0;
+    INERTIA = 1;
+    ENCODER = 2;
+    SPRING = 3;
+    DAMPED = 4;
+    SPIN = 5;
+    RATCHET = 6;
+    SWITCH = 7;
+  }
+
+  message Pref {
+    required uint32 layer_id = 1;
+    optional string layer_name = 2;
+    required bool active = 3;
+    optional Mode mode = 4;
+    optional uint32 ppr = 5;
+    optional float torque_limit = 6;
+  }
+}
+
+message RgbControl {
+  required Command command = 1;
+
+  enum Command {
+    RGB_ON = 1;
+    RGB_OFF = 2;
+    RGB_HUI = 3;
+    RGB_HUD = 4;
+    RGB_SAI = 5;
+    RGB_SAD = 6;
+    RGB_BRI = 7;
+    RGB_BRD = 8;
+    RGB_SPI = 9;
+    RGB_SPD = 10;
+    RGB_EFF = 11;
+    RGB_EFR = 12;
+  }
+}
+
+message RgbState {
+  required bool on = 1;
+  optional HSB color = 2;
+  optional Effect effect = 3;
+  optional uint32 speed = 4;
+  optional uint32 effect_count = 5;
+  optional uint32 effect_mask = 6;
+
+  message HSB {
+    required uint32 h = 1;
+    required uint32 s = 2;
+    required uint32 b = 3;
+  }
+
+  enum Effect {
+    SOLID = 0;
+    BREATHE = 1;
+    SPECTRUM = 2;
+    SWIRL = 3;
+    RAINBOW_SWEEP = 4;
+    REACTIVE = 5;
+    AURORA = 6;
+    RIPPLE = 7;
+    STATIC = 8;
+  }
+}
+
+message RgbIndicator {
+  optional bool enable = 1;
+  optional uint32 brightness_active = 2;
+  optional uint32 brightness_inactive = 3;
+}
+
+message EinkImage {
+  required uint32 id = 1;
+  optional bytes bits = 3;
+  optional uint32 x = 4;
+  optional uint32 y = 5;
+  optional uint32 width = 6;
+  optional uint32 height = 7;
+  optional bool partial = 8;
+}

@@ -1,0 +1,39 @@
+{
+  "name": "zmkx.app",
+  "private": true,
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 8080",
+    "build": "npm run build:proto && npm run build:keyboard && vite build",
+    "build:keyboard": "node ./build-keyboard-config.mjs",
+    "build:proto": "node ./build-proto.mjs",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+    "preview": "vite preview",
+    "postinstall": "npm run build:proto && npm run build:keyboard"
+  },
+  "dependencies": {
+    "@antv/data-set": "^0.11.8",
+    "@antv/g2": "^4.2.9",
+    "ant-design-vue": "^4.0.3",
+    "pinia": "^2.1.6",
+    "protobufjs": "^7.1.2",
+    "throttle-debounce": "^5.0.0",
+    "vue": "^3.3.4",
+    "vue-i18n": "^9.5.0",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@intlify/unplugin-vue-i18n": "^1.4.0",
+    "@types/node": "^18.11.18",
+    "@types/throttle-debounce": "^5.0.0",
+    "@types/w3c-web-hid": "^1.0.3",
+    "@types/w3c-web-usb": "^1.0.6",
+    "@vitejs/plugin-vue": "^4.4.0",
+    "@vue/tsconfig": "^0.4.0",
+    "fs-extra": "^11.1.0",
+    "protobufjs-cli": "^1.0.2",
+    "sass": "^1.69.2",
+    "typescript": "^5.2.2",
+    "vite": "^4.4.11",
+    "vue-tsc": "^1.8.27"
+  }
+}
