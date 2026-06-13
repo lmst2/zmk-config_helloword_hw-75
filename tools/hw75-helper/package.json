@@ -1,0 +1,14 @@
+{
+  "name": "hw75-helper",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "scripts": {
+    "start": "node ./src/server.mjs"
+  },
+  "dependencies": {
+    "node-hid": "^3.1.2",
+    "protobufjs": "^7.3.0",
+    "ws": "^8.17.0"
+  }
+}
