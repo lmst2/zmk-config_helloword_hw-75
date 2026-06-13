@@ -13,6 +13,7 @@
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #include <eink_app.h>
+#include <eink_mode.h>
 
 #include <pb_encode.h>
 #include <pb_decode.h>
@@ -24,6 +25,10 @@ static bool handle_eink_set_image(const usb_comm_MessageH2D *h2d, usb_comm_Messa
 	usb_comm_EinkImage *res = &d2h->payload.eink_image;
 
 	res->id = req->id;
+
+	/* Take over the panel: stop the mode loop (clock/weather minute tick) from
+	 * redrawing over this raw image until the host selects a mode again. */
+	eink_mode_hold_external();
 
 	bool partial = req->has_partial && req->partial;
 

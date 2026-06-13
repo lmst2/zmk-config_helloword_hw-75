@@ -43,6 +43,13 @@ int eink_mode_set_config(const struct eink_mode_entry *modes, uint8_t count, uin
 int eink_mode_set_active(uint8_t active_index);
 int eink_mode_cycle(int delta);
 
+/*
+ * Suspend mode redraws so a host-pushed raw image (EINK_SET_IMAGE) stays on the
+ * panel instead of being overwritten by the autonomous clock/weather tick.
+ * Released by eink_mode_set_active() / eink_mode_set_config().
+ */
+void eink_mode_hold_external(void);
+
 int eink_mode_push_frame(uint8_t mode_id, uint8_t frame_index, const uint8_t *bits,
 			 uint32_t bits_len);
 int eink_mode_push_clock(uint8_t hour, uint8_t minute, uint8_t day, uint8_t month, uint8_t weekday,

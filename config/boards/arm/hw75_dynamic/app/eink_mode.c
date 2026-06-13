@@ -93,6 +93,17 @@ enum render_reason {
 
 static enum render_reason g_pending_reason;
 
+/*
+ * External-image hold. When the host pushes a raw frame via EINK_SET_IMAGE
+ * (e.g. the 中枢's live now-playing card), the mode loop must stop redrawing
+ * the panel — otherwise the clock/weather minute tick (clock_tick_handler runs
+ * autonomously off the MCU uptime, with no host) overwrites the pushed image
+ * within 60 s. The hold gates panel writes in refresh_work_handler; the clock
+ * keeps advancing in the background. EINK_SET_ACTIVE / SET_CONFIG clears it and
+ * redraws the active mode.
+ */
+static bool g_external_hold;
+
 static uint32_t frame_key(uint8_t mode_id, uint8_t frame_index)
 {
 	return EINK_NVS_KEY_FRAME_BASE + ((uint32_t)mode_id) * EINK_NVS_FRAMES_PER_MODE +
@@ -333,6 +344,12 @@ static void refresh_work_handler(struct k_work *work)
 	enum render_reason reason = g_pending_reason;
 	g_pending_reason = RENDER_REASON_IDLE;
 
+	if (g_external_hold) {
+		/* A host-pushed raw image owns the panel; skip the mode redraw. */
+		k_mutex_unlock(&g_lock);
+		return;
+	}
+
 	if (!mode) {
 		log_render(0xFFu, 0xFFu, 0, (uint8_t)reason);
 		k_mutex_unlock(&g_lock);
@@ -412,9 +429,20 @@ int eink_mode_set_config(const struct eink_mode_entry *modes, uint8_t count, uin
 		HW75_DIAG_EVENT_EINK_MODE_CHANGED,
 		hw75_diag_pack_u8x4(prev_id, new_id, prev_type, new_type), false, 0U);
 
+	g_external_hold = false;
 	trigger_refresh(RENDER_REASON_CONFIG, K_NO_WAIT);
 	k_mutex_unlock(&g_lock);
 	return 0;
+}
+
+void eink_mode_hold_external(void)
+{
+	k_mutex_lock(&g_lock, K_FOREVER);
+	g_external_hold = true;
+	/* Drop any queued mode redraw so it can't fire between now and the raw
+	 * panel write the host is about to perform. */
+	k_work_cancel_delayable(&g_refresh_work);
+	k_mutex_unlock(&g_lock);
 }
 
 int eink_mode_set_active(uint8_t active_index)
@@ -448,6 +476,8 @@ int eink_mode_set_active(uint8_t active_index)
 				    false, 0U);
 	}
 
+	/* Selecting a mode releases any external-image hold and resumes drawing. */
+	g_external_hold = false;
 	trigger_refresh(RENDER_REASON_ACTIVE, K_NO_WAIT);
 	k_mutex_unlock(&g_lock);
 	return 0;
