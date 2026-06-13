@@ -373,7 +373,7 @@ Rgb.vue:toggle
 
 最近一次完整编译（2026-04，含 eink-modes / knob-calibration / uart_slip timeout / per-board options 瘦身）实测水位：
 
-> ⚠️ **下表是手抄快照，不会自动更新**，可能已与 HEAD 漂移（实测过预编译 elf 的 SRAM 余量约 176 B 而非 296 B）。**永远以一次新构建为准**：`west build` 结尾的 Zephyr `Memory region … %age Used` 报告给出 SRAM/FLASH；`arm-zephyr-eabi-nm --size-sort build/<board>/zephyr/zmk.elf | findstr usb_.2._msg` 给出 oneof union 大小。CI 现已对 keyboard 加 SRAM 水位闸（`.github/workflows/build.yml`，超 20384 B 失败）。本仓库其它复述这些数字的地方（CLAUDE.md rule 3、§3、§8）都视为"约值，权威看本表 / 重编确认"。
+> ℹ️ **下表是手抄快照**，但已用一次全新 `-p always` 构建复核（2026-06-13, keyboard@1.2）：SRAM **20184 B / 98.55% / margin 296 B**、FLASH **79912 B / 75.04%**、`usb_h2d/d2h_msg` **156 / 144 B** —— **与下表完全一致**。（曾有一份过期中间 build 目录算出 176 B 余量，那不是干净构建，已被本次 `-p always` 推翻。）改动后仍**以一次新构建为准**：`west build` 结尾的 Zephyr `Memory region … %age Used` 报告 + `arm-zephyr-eabi-nm --size-sort build/<board>/zephyr/zmk.elf | findstr usb_.2._msg`。CI 现已对 keyboard 加 SRAM 水位闸（`.github/workflows/build.yml`，超 20384 B 失败；当前 20184 B，距闸 200 B、距 20480 B 上限 296 B）。
 
 | 资源 | keyboard@1.2 | dynamic@B | 说明 |
 | --- | --- | --- | --- |
