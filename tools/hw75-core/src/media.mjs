@@ -1,37 +1,14 @@
 import { EventEmitter } from 'node:events';
-import { spawn } from 'node:child_process';
+
+import { getPlatform } from './platform/index.mjs';
 
 /*
- * Now-Playing reader via the Windows System Media Transport Controls (SMTC).
- * Polls the current media session for title / artist / playback status using a
- * WinRT call from PowerShell, and emits 'change' when any of them changes. Feeds
- * the e-ink Now-Playing card and lets the context engine know media is playing.
+ * Now-Playing reader. Polls the platform adapter for the current media session
+ * (title / artist / status / source app) and emits 'change' when any of them
+ * changes. Feeds the e-ink Now-Playing card and lets the context engine know
+ * media is playing. The OS-specific query lives in the platform adapter
+ * (Windows SMTC, Linux MPRIS/playerctl, macOS Music/Spotify).
  */
-
-const QUERY_SCRIPT = `
-$ErrorActionPreference = 'SilentlyContinue'
-Add-Type -AssemblyName System.Runtime.WindowsRuntime
-$asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
-  $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and
-  $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0]
-function Await($op, $type) {
-  $t = $asTask.MakeGenericMethod($type).Invoke($null, @($op))
-  $null = $t.Wait(2000)
-  $t.Result
-}
-[Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime] | Out-Null
-$mgr = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
-$s = $mgr.GetCurrentSession()
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-if ($s) {
-  $p = Await ($s.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
-  $pb = $s.GetPlaybackInfo()
-  ConvertTo-Json -Compress @{ title = [string]$p.Title; artist = [string]$p.Artist; status = [string]$pb.PlaybackStatus; app = [string]$s.SourceAppUserModelId }
-} else {
-  '{}'
-}
-`;
-
 export class Media extends EventEmitter {
   constructor({ intervalMs = 1500 } = {}) {
     super();
@@ -68,7 +45,8 @@ export class Media extends EventEmitter {
     }
 
     try {
-      const info = await queryMedia();
+      const platform = await getPlatform();
+      const info = await platform.nowPlaying();
       if (info && (info.title !== this.current.title || info.artist !== this.current.artist ||
                    info.status !== this.current.status || info.app !== this.current.app)) {
         this.current = info;
@@ -82,31 +60,4 @@ export class Media extends EventEmitter {
       this.timer = setTimeout(() => this.poll(), this.intervalMs);
     }
   }
-}
-
-function queryMedia() {
-  return new Promise((resolve, reject) => {
-    const child = spawn('powershell.exe', [
-      '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden',
-      '-EncodedCommand', Buffer.from(QUERY_SCRIPT, 'utf16le').toString('base64'),
-    ], { windowsHide: true });
-
-    let stdout = '';
-    child.stdout.on('data', (chunk) => { stdout += chunk.toString('utf8'); });
-    child.on('error', reject);
-    child.on('close', () => {
-      const text = stdout.trim();
-      try {
-        const parsed = text ? JSON.parse(text) : {};
-        resolve({
-          title: String(parsed.title || ''),
-          artist: String(parsed.artist || ''),
-          status: String(parsed.status || ''),
-          app: String(parsed.app || ''),
-        });
-      } catch {
-        resolve(undefined);
-      }
-    });
-  });
 }
