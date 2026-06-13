@@ -3,7 +3,6 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 
 import { Device } from './keyboard.mjs';
 import { Bus } from './bus.mjs';
@@ -26,7 +25,9 @@ const DATA_DIR = path.join(APPDATA_BASE, 'hw75-core');
 const LEGACY_DATA_DIR = path.join(APPDATA_BASE, 'hw75-helper');
 const PROFILE_PATH = path.join(DATA_DIR, 'profiles.json');
 const CORE_CONFIG_PATH = path.join(DATA_DIR, 'core-config.json');
-const SCRIPT_PATH = fileURLToPath(import.meta.url);
+// Entry script when run via `node <script>`; undefined when this is a packaged
+// single executable (where process.execPath is the exe itself). Drives restart.
+const ENTRY = process.argv[1] && process.argv[1] !== process.execPath ? process.argv[1] : undefined;
 
 const ACTIONS = [
   { code: 100, moduleId: 'system', actionId: 'show_desktop', displayName: '显示桌面', category: '系统', icon: 'desktop', schema: [] },
@@ -101,10 +102,10 @@ const ACTIONS = [
 
 let profileState = { nextProfileId: 1, profiles: [] };
 
-await ensureProfileState();
-
 const coreConfig = new CoreConfig(CORE_CONFIG_PATH);
-await coreConfig.load();
+/* Profile state + core config are loaded in the listen callback (below) before
+ * services start — kept off the top level so the entry has no top-level await
+ * and can bundle to CJS for single-executable packaging. */
 
 /* The 中枢 owns a HID session to BOTH boards: the dynamic module (knob / e-ink,
  * the primary for weather/clock pushes) and the keyboard board (touchbar /
@@ -213,7 +214,9 @@ const bus = new Bus({ httpServer: server, keyboard, keyboardBoard, coreConfig, w
 weather.bus = bus;
 clock.bus = bus;
 
-server.listen(PORT, HOST, () => {
+server.listen(PORT, HOST, async () => {
+  await ensureProfileState();
+  await coreConfig.load();
   console.log(`[hw75-core] listening on http://${HOST}:${PORT}`);
   console.log(`[hw75-core] WebSocket at ws://${HOST}:${PORT}/ws`);
   keyboard.start();
@@ -516,26 +519,20 @@ function scheduleRestart() {
 
   restartScheduled = true;
 
-  /* Relaunch via a tiny detached bootstrap that waits for this process to exit
-   * (freeing the port) before starting a fresh server. Cross-platform, no
-   * shell — works the same on Windows / Linux / macOS. */
-  const bootstrap =
-    'setTimeout(() => { const { spawn } = require("node:child_process"); ' +
-    `spawn(process.execPath, [${JSON.stringify(SCRIPT_PATH)}], ` +
-    '{ detached: true, stdio: "ignore" }).unref(); }, 700);';
-
-  const child = spawn(process.execPath, ['-e', bootstrap], {
-    cwd: path.dirname(SCRIPT_PATH),
-    detached: true,
-    stdio: 'ignore',
-  });
-  child.unref();
+  /* Close the listener first, then relaunch from inside the close callback (port
+   * already freed, so no bind race) and exit. The child is detached + unref'd so
+   * it outlives us. Cross-platform and works whether we're `node <script>` or a
+   * packaged single executable (process.execPath is the exe; ENTRY is unset). */
+  const relaunch = () => {
+    const args = ENTRY ? [ENTRY] : [];
+    spawn(process.execPath, args, { detached: true, stdio: 'ignore' }).unref();
+  };
 
   setTimeout(() => {
     server.close(() => {
+      relaunch();
       process.exit(0);
     });
-
-    setTimeout(() => process.exit(0), 800).unref?.();
+    setTimeout(() => { relaunch(); process.exit(0); }, 800).unref?.();
   }, 120);
 }

@@ -273,7 +273,7 @@ export class Device extends EventEmitter {
         const packet = Buffer.alloc(HID_REPORT_SIZE + 1);
         packet[0] = HID_REPORT_ID;
         packet[1] = chunk.length;
-        chunk.copy(packet, 2);
+        packet.set(chunk, 2); /* Uint8Array.set — works whether chunk is Buffer or Uint8Array */
         this.device.write(packet);
       }
     } catch (error) {

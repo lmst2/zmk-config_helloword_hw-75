@@ -1,16 +1,13 @@
 /*
- * Loads usb_comm.proto at runtime via protobufjs. The proto file at
- * config/proto/usb_comm.proto is the single source of truth; we preprocess it
- * to strip nanopb-specific C generator options (which protobufjs cannot parse)
+ * Loads usb_comm.proto via protobufjs. The proto text is inlined at build time
+ * (scripts/gen-proto.mjs -> usb_comm.proto.mjs) so this works both in dev and
+ * inside a bundled single executable, where filesystem/relative paths don't
+ * resolve. config/proto/usb_comm.proto stays the single source of truth; we
+ * strip nanopb-specific C generator options (which protobufjs can't parse)
  * before handing the text to protobuf.parse.
  */
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
-import fs from 'node:fs/promises';
 import protobuf from 'protobufjs';
-
-const here = dirname(fileURLToPath(import.meta.url));
-const protoPath = resolve(here, '../../..', 'config/proto/usb_comm.proto');
+import PROTO_TEXT from './usb_comm.proto.mjs';
 
 function stripNanopbAnnotations(text) {
   return text
@@ -19,8 +16,7 @@ function stripNanopbAnnotations(text) {
     .replace(/\s*option\s*\(nanopb_msgopt\)[^;]*;\s*/g, '');
 }
 
-const raw = await fs.readFile(protoPath, 'utf8');
-const cleaned = stripNanopbAnnotations(raw);
+const cleaned = stripNanopbAnnotations(PROTO_TEXT);
 
 const parsed = protobuf.parse(cleaned, { keepCase: false });
 const root = parsed.root;
@@ -28,7 +24,7 @@ root.resolveAll();
 
 const comm = root.lookup('usb.comm');
 if (!comm) {
-  throw new Error(`Failed to locate usb.comm namespace in ${protoPath}`);
+  throw new Error('Failed to locate usb.comm namespace in usb_comm.proto');
 }
 
 function flattenEnum(enumNode) {

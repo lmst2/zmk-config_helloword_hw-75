@@ -1,0 +1,7 @@
+{
+  "assets": [
+    "node_modules/node-hid/prebuilds/**",
+    "node_modules/@napi-rs/canvas-*/**",
+    "node_modules/@napi-rs/canvas/**/*.js"
+  ]
+}

@@ -4,12 +4,20 @@
   "version": "0.3.0",
   "type": "module",
   "scripts": {
-    "start": "node ./src/server.mjs"
+    "gen:proto": "node scripts/gen-proto.mjs",
+    "prestart": "node scripts/gen-proto.mjs",
+    "start": "node ./src/server.mjs",
+    "bundle": "node scripts/gen-proto.mjs && esbuild src/server.mjs --bundle --platform=node --format=cjs --target=node18 --outfile=dist/hw75-core.cjs --external:node-hid --external:@napi-rs/canvas",
+    "package": "npm run bundle && pkg dist/hw75-core.cjs -c pkg.config.json"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.0",
     "node-hid": "^3.1.2",
     "protobufjs": "^7.3.0",
     "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.20.0",
+    "esbuild": "^0.28.1"
   }
 }

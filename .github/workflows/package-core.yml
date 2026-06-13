@@ -1,0 +1,61 @@
+name: Package 中枢 (hw75-core)
+
+# Builds the 中枢 / hw75-core helper into a single executable per platform.
+# node-hid and @napi-rs/canvas are native modules, so each target is built on
+# its own runner (npm ci pulls the correct prebuilt binaries) rather than
+# cross-compiled. pkg bundles the .node files as assets and self-extracts them
+# at runtime, so each artifact is a single self-contained file.
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - 'core-v*'
+
+jobs:
+  package:
+    name: ${{ matrix.out }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: node20-win-x64,     out: hw75-core-win-x64.exe }
+          - { os: ubuntu-latest,  target: node20-linux-x64,   out: hw75-core-linux-x64 }
+          - { os: macos-13,       target: node20-macos-x64,   out: hw75-core-macos-x64 }
+          - { os: macos-14,       target: node20-macos-arm64, out: hw75-core-macos-arm64 }
+    defaults:
+      run:
+        working-directory: tools/hw75-core
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Pulls the platform's node-hid prebuild + the matching @napi-rs/canvas
+      # native package (selected by optionalDependencies).
+      - run: npm ci
+
+      # gen-proto -> esbuild bundle -> pkg single exe for this target.
+      - run: npm run package -- -t ${{ matrix.target }} -o dist/${{ matrix.out }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.out }}
+          path: tools/hw75-core/dist/${{ matrix.out }}
+          if-no-files-found: error
+
+  # On a core-v* tag, gather the four binaries into a GitHub Release.
+  release:
+    if: startsWith(github.ref, 'refs/tags/core-v')
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
