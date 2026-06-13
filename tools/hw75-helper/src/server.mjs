@@ -13,6 +13,7 @@ import { Clock } from './clock.mjs';
 import { Foreground } from './foreground.mjs';
 import { ContextEngine } from './engine.mjs';
 import { DEFAULT_RULES } from './rules.mjs';
+import { Media } from './media.mjs';
 
 const HOST = '127.0.0.1';
 const PORT = 8755;
@@ -125,6 +126,11 @@ foreground.on('change', (info) => {
 const engine = new ContextEngine({ dynamic: keyboard, keyboardBoard, foreground });
 engine.setRules(DEFAULT_RULES);
 
+const media = new Media();
+media.on('change', (info) => {
+  console.log(`[media] ${info.status}: ${info.title}${info.artist ? ' - ' + info.artist : ''}`);
+});
+
 const server = http.createServer(async (req, res) => {
   try {
     if (handleCors(req, res)) {
@@ -143,6 +149,7 @@ const server = http.createServer(async (req, res) => {
         keyboard: { connected: keyboard.isConnected(), path: keyboard.devicePath ?? null },
         keyboardBoard: { connected: keyboardBoard.isConnected(), path: keyboardBoard.devicePath ?? null },
         foreground: foreground.snapshot(),
+        media: media.snapshot(),
         config: coreConfig.snapshot(),
       });
     }
@@ -210,6 +217,7 @@ server.listen(PORT, HOST, () => {
   clock.start();
   foreground.start();
   engine.start();
+  media.start();
 });
 
 let restartScheduled = false;
