@@ -171,6 +171,51 @@ int uart_slip_receive(const struct device *dev, uint8_t *buf, uint32_t limit, ui
 	return -ENOMEM;
 }
 
+int uart_slip_receive_nb(const struct device *dev, uint8_t *buf, uint32_t limit, uint32_t *len)
+{
+	struct uart_slip_data *data = dev->data;
+	uint8_t b;
+
+	while (*len <= limit) {
+		if (!ring_buf_get(&data->rx_rb, &b, 1)) {
+			return -EAGAIN;
+		}
+
+		switch (data->state) {
+		case STATE_SKIP:
+			if (b == SLIP_END) {
+				data->state = STATE_BYTE;
+			}
+			break;
+		case STATE_BYTE:
+			if (b == SLIP_ESC) {
+				data->state = STATE_ESC;
+			} else if (b == SLIP_END) {
+				if (*len > 0) {
+					LOG_HEXDUMP_DBG(buf, *len, "RX");
+					return 0;
+				}
+			} else {
+				buf[(*len)++] = b;
+			}
+			break;
+		case STATE_ESC:
+			if (b == SLIP_ESC_END) {
+				buf[(*len)++] = SLIP_END;
+				data->state = STATE_BYTE;
+			} else if (b == SLIP_ESC_ESC) {
+				buf[(*len)++] = SLIP_ESC;
+				data->state = STATE_BYTE;
+			} else {
+				data->state = STATE_SKIP;
+			}
+			break;
+		}
+	}
+
+	return -ENOMEM;
+}
+
 static void uart_slip_isr(const struct device *uart, void *user_data)
 {
 	const struct device *dev = (const struct device *)user_data;

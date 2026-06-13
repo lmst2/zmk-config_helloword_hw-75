@@ -75,3 +75,32 @@ message SlotFired
 	required uint32 slot_index = 1;
 	optional uint32 slot_type = 2;
 }
+
+/* ---- Reverse channel: dynamic -> keyboard (F6) ---- */
+
+enum ActionD2K {
+	D2K_NOP = 0;
+	D2K_RGB = 1;
+	D2K_TOUCHBAR_MODE = 2;
+}
+
+message MessageD2K
+{
+	required ActionD2K action = 1;
+	oneof payload
+	{
+		Nop nop = 2;
+		RgbCmd rgb = 3;
+		TbMode tb_mode = 4;
+	}
+}
+
+message RgbCmd
+{
+	required uint32 command = 1;     // 1 toggle, 2 bri+, 3 bri-, 4 eff+, 5 eff-
+}
+
+message TbMode
+{
+	required uint32 mode = 1;        // 0 PAN, 1 APP_SWITCH, 2 DESKTOP_SWITCH
+}

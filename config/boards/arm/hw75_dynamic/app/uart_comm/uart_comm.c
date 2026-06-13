@@ -57,6 +57,26 @@ static void uart_comm_handle(uint32_t len)
 	}
 }
 
+#include <pb_encode.h>
+
+static uint8_t uart_tx_buf[CONFIG_HW75_UART_COMM_MAX_RX_MESSAGE_SIZE];
+
+void uart_comm_send_rgb_cmd(uint32_t command)
+{
+	uart_comm_MessageD2K d2k = uart_comm_MessageD2K_init_zero;
+	d2k.action = uart_comm_ActionD2K_D2K_RGB;
+	d2k.which_payload = uart_comm_MessageD2K_rgb_tag;
+	d2k.payload.rgb.command = command;
+
+	pb_ostream_t stream = pb_ostream_from_buffer(uart_tx_buf, sizeof(uart_tx_buf));
+	if (!pb_encode_delimited(&stream, uart_comm_MessageD2K_fields, &d2k)) {
+		LOG_ERR("Failed encoding d2k message: %s", stream.errmsg);
+		return;
+	}
+
+	(void)uart_slip_send(slip, uart_tx_buf, stream.bytes_written);
+}
+
 static void uart_comm_thread(void *p1, void *p2, void *p3)
 {
 	ARG_UNUSED(p1);

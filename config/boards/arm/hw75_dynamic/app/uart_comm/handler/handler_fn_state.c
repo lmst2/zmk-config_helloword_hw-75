@@ -16,6 +16,10 @@ bool handle_fn_state(const uart_comm_MessageK2D *k2d)
 	if (report->pressed) {
 		current_layer = zmk_keymap_highest_layer_active();
 		zmk_keymap_layer_to(1);
+		/* Demonstrate the reverse channel end-to-end: tapping FN on the
+		 * keyboard makes the dynamic drive the keyboard's own RGB effect
+		 * over the D2K link (rebind to anything; the transport is the point). */
+		uart_comm_send_rgb_cmd(4); /* effect next */
 	} else {
 		zmk_keymap_layer_to(current_layer);
 	}
