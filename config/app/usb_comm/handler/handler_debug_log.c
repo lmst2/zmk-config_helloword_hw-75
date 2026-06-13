@@ -13,6 +13,21 @@
 #include "handler.h"
 #include "usb_comm.pb.h"
 
+/*
+ * fill_log_event() / encode_log_snapshot() cast the hand-written C enums in
+ * <app/diag_log.h> straight to the nanopb proto enums by integer value, so the
+ * two must stay numerically identical. config/proto/check_enum_sync.py verifies
+ * every value in CI; these BUILD_ASSERTs are a local compile-time tripwire on
+ * the first/last anchor of each enum so drift fails the build immediately.
+ */
+BUILD_ASSERT((int)HW75_DIAG_LEVEL_ERROR == (int)usb_comm_LogLevel_ERROR);
+BUILD_ASSERT((int)HW75_DIAG_LEVEL_TRACE == (int)usb_comm_LogLevel_TRACE);
+BUILD_ASSERT((int)HW75_DIAG_MODULE_SYSTEM == (int)usb_comm_LogModule_SYSTEM);
+BUILD_ASSERT((int)HW75_DIAG_MODULE_HELPER_CORE == (int)usb_comm_LogModule_HELPER_CORE);
+BUILD_ASSERT((int)HW75_DIAG_EVENT_SYSTEM_INIT == (int)usb_comm_LogEventId_LOG_EVENT_SYSTEM_INIT);
+BUILD_ASSERT((int)HW75_DIAG_EVENT_HELPER_WEATHER_SYNC ==
+	     (int)usb_comm_LogEventId_LOG_EVENT_HELPER_WEATHER_SYNC);
+
 struct log_encode_context {
 	size_t snapshot_count;
 	size_t boot_event_count;

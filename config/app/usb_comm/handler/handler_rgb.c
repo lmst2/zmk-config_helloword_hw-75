@@ -10,6 +10,17 @@
 
 #include <zmk/rgb_underglow.h>
 #include <app/indicator.h>
+#include <app/hw75_rgb_effects.h>
+
+/*
+ * handle_rgb_control() passes the proto effect index straight through as
+ * (int)req->effect, and rgb_effects.c renders by HW75_RGB_EFFECT_* value, so
+ * the proto enum and hw75_rgb_effect_id must match. Compile-time tripwire on
+ * the first/last anchor (check_enum_sync.py covers every value in CI).
+ */
+BUILD_ASSERT((int)HW75_RGB_EFFECT_SOLID == (int)usb_comm_RgbState_Effect_SOLID);
+BUILD_ASSERT((int)HW75_RGB_EFFECT_STATIC == (int)usb_comm_RgbState_Effect_STATIC);
+
 static bool handle_rgb_get_state(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *d2h,
 				 const void *bytes, uint32_t bytes_len);
 

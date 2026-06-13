@@ -83,6 +83,11 @@ static bool read_bytes_field(pb_istream_t *stream, const pb_field_t *field, void
 
 	if (stream->bytes_left > sizeof(bytes_field)) {
 		LOG_ERR("Buffer overflows decoding %d bytes", stream->bytes_left);
+		hw75_diag_log_event(HW75_DIAG_LEVEL_ERROR, HW75_DIAG_MODULE_USB_COMM, 0U,
+				    HW75_DIAG_EVENT_USB_BYTES_OVERFLOW,
+				    hw75_diag_pack_u16x2((uint16_t)stream->bytes_left,
+							 (uint16_t)sizeof(bytes_field)),
+				    false, 0U);
 		return false;
 	}
 
@@ -180,6 +185,10 @@ static void usb_comm_handle_message()
 
 	if (!pb_decode_delimited(&h2d_stream, usb_comm_MessageH2D_fields, h2d)) {
 		LOG_ERR("Failed decoding h2d message: %s", h2d_stream.errmsg);
+		/* Thread context (same as the stack-watermark diag below), so logging
+		 * here is safe; surfaces a malformed request to the host Debug page. */
+		hw75_diag_log_event(HW75_DIAG_LEVEL_ERROR, HW75_DIAG_MODULE_USB_COMM, 0U,
+				    HW75_DIAG_EVENT_USB_DECODE_FAIL, usb_rx_len, false, 0U);
 		return;
 	}
 
@@ -201,6 +210,9 @@ static void usb_comm_handle_message()
 
 	if (!pb_encode_delimited(&d2h_stream, usb_comm_MessageD2H_fields, d2h)) {
 		LOG_ERR("Failed encoding d2h message: %s", d2h_stream.errmsg);
+		hw75_diag_log_event(HW75_DIAG_LEVEL_ERROR, HW75_DIAG_MODULE_USB_COMM, 0U,
+				    HW75_DIAG_EVENT_USB_ENCODE_FAIL, (uint32_t)d2h->action, false,
+				    0U);
 		return;
 	}
 	usb_comm_log_stack_watermark((uint16_t)h2d->action, 3U);

@@ -448,17 +448,31 @@ static bool handle_touchbar_set_config(const usb_comm_MessageH2D *h2d,
 	if (req->has_segment_count) {
 		g_tb.view.segment_count = (uint8_t)req->segment_count;
 	}
-	if (g_tb.received & TB_RX_TOUCH_MASKS) {
+	if ((g_tb.received & (TB_RX_TOUCH_MASKS | TB_RX_ENTRY_MASKS)) ==
+	    (TB_RX_TOUCH_MASKS | TB_RX_ENTRY_MASKS)) {
+		/* Both mask arrays present: their lengths must agree, otherwise the
+		 * chosen segment_count would be arbitrary (last-wins) and pair fresh
+		 * masks against stale seeded slots. The official host always sends
+		 * equal lengths; reject a mismatched pair rather than guess.
+		 */
+		if (g_tb.touch_mask_count != g_tb.entry_mask_count) {
+			return false;
+		}
 		g_tb.view.segment_count = g_tb.touch_mask_count;
-	}
-	if (g_tb.received & TB_RX_ENTRY_MASKS) {
+	} else if (g_tb.received & TB_RX_TOUCH_MASKS) {
+		g_tb.view.segment_count = g_tb.touch_mask_count;
+	} else if (g_tb.received & TB_RX_ENTRY_MASKS) {
 		g_tb.view.segment_count = g_tb.entry_mask_count;
 	}
 	if ((g_tb.received & (TB_RX_TOUCH_MASKS | TB_RX_ENTRY_MASKS)) == 0U) {
-		/* No new masks, fall back to legacy two-segment fields so older
-		 * hosts can still poke the touchbar config.
+		/* No new masks: fall back to legacy two-segment fields so older hosts
+		 * can still poke the touchbar config — but only force 2 segments when
+		 * the host didn't explicitly send segment_count, else a mode-only SET
+		 * would truncate a >2-segment config seeded from the driver.
 		 */
-		g_tb.view.segment_count = 2U;
+		if (!req->has_segment_count) {
+			g_tb.view.segment_count = 2U;
+		}
 		if (req->has_left_touch_mask) {
 			g_tb.view.segment_touch_masks[0] = (uint8_t)req->left_touch_mask;
 		}
