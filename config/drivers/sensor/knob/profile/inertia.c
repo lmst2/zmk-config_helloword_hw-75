@@ -16,6 +16,21 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(knob_inertia, CONFIG_ZMK_LOG_LEVEL);
 
+/*
+ * The profile tick runs every 200 us (5 kHz), so the decay is a per-tick factor
+ * very close to 1. ~0.9995 gives roughly a 1.5-2 s coast; closer to 1.0 coasts
+ * longer, lower stops sooner. This is the knob "damping" the user tunes (web
+ * config wiring is a follow-up); DEADBAND/STOP are in rad/s.
+ */
+#define KNOB_INERTIA_DEFAULT_DECAY 0.9995f
+#define KNOB_INERTIA_DEADBAND 0.25f
+#define KNOB_INERTIA_STOP 0.50f
+
+static inline float absf(float x)
+{
+	return x < 0.0f ? -x : x;
+}
+
 struct knob_inertia_config {
 	KNOB_PROFILE_CFG_ROM;
 };
@@ -26,8 +41,8 @@ struct knob_inertia_data {
 	int32_t pulses;
 	int32_t reported_pulses;
 
-	float last_velocity;
-	float max_velocity;
+	float vel;   /* virtual flywheel velocity (rad/s) */
+	float decay; /* per-tick velocity decay factor (0..1), web-tunable later */
 };
 
 static int knob_inertia_enable(const struct device *dev)
@@ -49,8 +64,8 @@ static int knob_inertia_enable(const struct device *dev)
 	data->pulses = 0;
 	data->reported_pulses = 0;
 
-	data->last_velocity = knob_get_velocity(cfg->knob);
-	data->max_velocity = 0.0f;
+	data->vel = 0.0f;
+	data->decay = KNOB_INERTIA_DEFAULT_DECAY;
 
 	return 0;
 }
@@ -83,39 +98,27 @@ static int knob_inertia_tick(const struct device *dev, struct motor_control *mc)
 		data->pulses--;
 	}
 
+	/*
+	 * Virtual flywheel. While the user spins it faster than the current coast,
+	 * adopt their velocity — so the coast always starts at the speed you let go
+	 * at, and a harder flick coasts faster and longer. Otherwise decay smoothly
+	 * (exponential, viscous-friction-like) toward a stop; holding it still stops
+	 * it. The motor is velocity-driven, so it physically spins down like a real
+	 * weighted knob — continuous target, no per-detent notch.
+	 */
 	float v = knob_get_velocity(cfg->knob);
-	float a = v - data->last_velocity;
-	if (v == 0.0f) {
-		mc->target = 0.0f;
-		data->max_velocity = 0.0f;
-	} else if (v > 0.0f) {
-		if (a > 1.0f || v > data->max_velocity) {
-			mc->target = v;
-			data->max_velocity = v;
-		} else if (a < -2.0f) {
-			mc->target += a;
-			if (mc->target < 1.0f) {
-				mc->target = 0.0f;
-				data->max_velocity = 0.0f;
-			}
-		} else {
-			mc->target -= 0.001f;
-		}
-	} else if (v < 0.0f) {
-		if (a < -1.0f || v < data->max_velocity) {
-			mc->target = v;
-			data->max_velocity = v;
-		} else if (a > 2.0f) {
-			mc->target += a;
-			if (mc->target > -1.0f) {
-				mc->target = 0.0f;
-				data->max_velocity = 0.0f;
-			}
-		} else {
-			mc->target += 0.001f;
+	if (absf(v) < KNOB_INERTIA_STOP) {
+		data->vel = 0.0f;
+	} else if (absf(v) > absf(data->vel) + KNOB_INERTIA_DEADBAND) {
+		data->vel = v;
+	} else {
+		data->vel *= data->decay;
+		if (absf(data->vel) < KNOB_INERTIA_STOP) {
+			data->vel = 0.0f;
 		}
 	}
-	data->last_velocity = mc->target;
+
+	mc->target = data->vel;
 
 	return 0;
 }
