@@ -10,6 +10,7 @@ import { Bus } from './bus.mjs';
 import { CoreConfig } from './coreConfig.mjs';
 import { Weather } from './weather.mjs';
 import { Clock } from './clock.mjs';
+import { Foreground } from './foreground.mjs';
 
 const HOST = '127.0.0.1';
 const PORT = 8755;
@@ -66,7 +67,39 @@ const ACTIONS = [
       { key: 'cwd', label: '工作目录', type: 'path', required: false, placeholder: 'E:\\code' },
     ],
   },
+  {
+    code: 400,
+    moduleId: 'input',
+    actionId: 'inject_key',
+    displayName: '注入按键',
+    category: '输入',
+    icon: 'enter',
+    schema: [
+      { key: 'keys', label: 'SendKeys 序列', type: 'text', required: true, placeholder: '^c / {LEFT} / %{TAB}' },
+    ],
+  },
+  {
+    code: 401,
+    moduleId: 'input',
+    actionId: 'media_key',
+    displayName: '媒体键',
+    category: '输入',
+    icon: 'sound',
+    schema: [
+      { key: 'key', label: '媒体键', type: 'text', required: true, placeholder: 'volume_up|volume_down|mute|play_pause|next|prev' },
+    ],
+  },
 ];
+
+/* Virtual-key codes for the media/volume keys injectable via media_key. */
+const MEDIA_VK = {
+  volume_up: 0xAF,
+  volume_down: 0xAE,
+  mute: 0xAD,
+  play_pause: 0xB3,
+  next: 0xB0,
+  prev: 0xB1,
+};
 
 let profileState = { nextProfileId: 1, profiles: [] };
 
@@ -76,6 +109,10 @@ const coreConfig = new CoreConfig(CORE_CONFIG_PATH);
 await coreConfig.load();
 
 const keyboard = new Keyboard();
+const foreground = new Foreground();
+foreground.on('change', (info) => {
+  console.log(`[foreground] ${info.process} :: ${info.title}`);
+});
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -93,6 +130,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, {
         version: HELPER_VERSION,
         keyboard: { connected: keyboard.isConnected(), path: keyboard.devicePath ?? null },
+        foreground: foreground.snapshot(),
         config: coreConfig.snapshot(),
       });
     }
@@ -157,6 +195,7 @@ server.listen(PORT, HOST, () => {
   keyboard.start();
   weather.start();
   clock.start();
+  foreground.start();
 });
 
 let restartScheduled = false;
@@ -355,6 +394,10 @@ try {
       return runDetached(targetString(payload.target, 'App path'), splitArgs(payload.args));
     case 'run_command':
       return runDetached(targetString(payload.command, 'Command'), splitArgs(payload.args), optionalString(payload.cwd));
+    case 'inject_key':
+      return injectSendKeys(targetString(payload.keys, 'Keys'));
+    case 'media_key':
+      return injectMediaKey(targetString(payload.key, 'Media key'));
     default:
       throw new Error(`Unsupported action ${action.actionId}`);
   }
@@ -433,6 +476,33 @@ function openWithShell(target) {
   return runPowerShellWait('Start-Process -FilePath $env:HW75_TARGET | Out-Null', {
     HW75_TARGET: target,
   });
+}
+
+function injectSendKeys(keys) {
+  return runPowerShellWait(
+    '$ws = New-Object -ComObject WScript.Shell; [void]$ws.SendKeys($env:HW75_KEYS)',
+    { HW75_KEYS: keys });
+}
+
+function injectMediaKey(name) {
+  const vk = MEDIA_VK[name];
+  if (vk === undefined) {
+    throw new Error(`Unknown media key ${name}`);
+  }
+
+  const script = `
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class Hw75Key {
+  [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+}
+"@
+$vk = [byte]$env:HW75_VK
+[Hw75Key]::keybd_event($vk, 0, 0, [UIntPtr]::Zero)
+[Hw75Key]::keybd_event($vk, 0, 2, [UIntPtr]::Zero)
+`;
+  return runPowerShellWait(script, { HW75_VK: String(vk) });
 }
 
 function encodePowerShell(script) {
