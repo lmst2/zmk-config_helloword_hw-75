@@ -88,6 +88,17 @@ void knob_pulse(const struct device *dev, uint8_t strength, uint8_t count);
  */
 void knob_set_detents(const struct device *dev, uint8_t count, uint8_t strength, bool endstops);
 
+/**
+ * @brief Set an arbitrary knob feel at runtime (transient; not persisted):
+ * mode + encoder density + torque firmness, with free travel (no end-stops).
+ * Used by the host context engine to reshape the knob per foreground app.
+ *
+ * @param mode     enum knob_mode value.
+ * @param ppr      encoder density (detents/rev) for encoder-style modes; 0 keeps current.
+ * @param strength 0..100 torque firmness.
+ */
+void knob_set_feel(const struct device *dev, uint8_t mode, uint16_t ppr, uint8_t strength);
+
 #ifdef __cplusplus
 }
 #endif

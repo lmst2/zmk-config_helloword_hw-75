@@ -263,6 +263,28 @@ void knob_set_detents(const struct device *dev, uint8_t count, uint8_t strength,
 					       ((float)strength / 100.0f));
 }
 
+void knob_set_feel(const struct device *dev, uint8_t mode, uint16_t ppr, uint8_t strength)
+{
+	const struct knob_config *config = dev->config;
+
+	if (mode > KNOB_SWITCH) {
+		mode = KNOB_ENCODER;
+	}
+	if (strength > 100U) {
+		strength = 100U;
+	}
+
+	knob_set_mode(dev, (enum knob_mode)mode);
+	if (ppr > 0U) {
+		knob_set_encoder_ppr(dev, ppr);
+	}
+	knob_set_position_limit(dev, 0.0f, 0.0f); /* free travel, no walls */
+	motor_set_torque_limit(config->motor,
+			       KNOB_DETENT_MIN_TORQUE +
+				       (KNOB_DETENT_MAX_TORQUE - KNOB_DETENT_MIN_TORQUE) *
+					       ((float)strength / 100.0f));
+}
+
 static void knob_report_work_handler(struct k_work *work)
 {
 	struct knob_data *data = CONTAINER_OF(work, struct knob_data, report_work);

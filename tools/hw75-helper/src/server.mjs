@@ -11,6 +11,8 @@ import { CoreConfig } from './coreConfig.mjs';
 import { Weather } from './weather.mjs';
 import { Clock } from './clock.mjs';
 import { Foreground } from './foreground.mjs';
+import { ContextEngine } from './engine.mjs';
+import { DEFAULT_RULES } from './rules.mjs';
 
 const HOST = '127.0.0.1';
 const PORT = 8755;
@@ -118,6 +120,11 @@ foreground.on('change', (info) => {
   console.log(`[foreground] ${info.process} :: ${info.title}`);
 });
 
+/* The per-application context engine: foreground app -> device scene. Sends knob
+ * feel/detents + e-ink to the dynamic, RGB theme to the keyboard board. */
+const engine = new ContextEngine({ dynamic: keyboard, keyboardBoard, foreground });
+engine.setRules(DEFAULT_RULES);
+
 const server = http.createServer(async (req, res) => {
   try {
     if (handleCors(req, res)) {
@@ -202,6 +209,7 @@ server.listen(PORT, HOST, () => {
   weather.start();
   clock.start();
   foreground.start();
+  engine.start();
 });
 
 let restartScheduled = false;

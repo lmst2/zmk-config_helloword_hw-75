@@ -312,3 +312,27 @@ static bool handle_knob_set_detents(const usb_comm_MessageH2D *h2d, usb_comm_Mes
 
 USB_COMM_HANDLER_DEFINE(usb_comm_Action_KNOB_SET_DETENTS, usb_comm_MessageD2H_nop_tag,
 			handle_knob_set_detents);
+
+static bool handle_knob_set_feel(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *d2h,
+				 const void *bytes, uint32_t bytes_len)
+{
+	ARG_UNUSED(d2h);
+	ARG_UNUSED(bytes);
+	ARG_UNUSED(bytes_len);
+
+	const usb_comm_KnobFeel *req = &h2d->payload.knob_feel;
+
+	if (!knob) {
+		return false;
+	}
+
+	uint8_t mode = (uint8_t)MIN(req->mode, 7U);
+	uint16_t ppr = req->has_ppr ? (uint16_t)req->ppr : 0U;
+	uint8_t strength = req->has_strength ? (uint8_t)MIN(req->strength, 100U) : 50U;
+	knob_set_feel(knob, mode, ppr, strength);
+
+	return true;
+}
+
+USB_COMM_HANDLER_DEFINE(usb_comm_Action_KNOB_SET_FEEL, usb_comm_MessageD2H_nop_tag,
+			handle_knob_set_feel);
