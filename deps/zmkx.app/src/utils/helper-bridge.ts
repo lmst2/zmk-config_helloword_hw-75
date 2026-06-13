@@ -54,7 +54,7 @@ export type HelperHealthStatus = {
 
 const HELPER_BASE_URL = 'http://127.0.0.1:8755';
 const REQUEST_TIMEOUT_MS = 1200;
-// Must match tools/hw75-helper/src/server.mjs HELPER_VERSION.
+// Must match tools/hw75-core/src/server.mjs HELPER_VERSION.
 export const EXPECTED_HELPER_VERSION = '0.3.0';
 
 export async function getHelperHealth(): Promise<boolean> {

@@ -1,6 +1,6 @@
 import { UsbComm } from './protoLoader.mjs';
 
-const USER_AGENT = 'hw75-helper/0.3 (+https://github.com/hellowordkb/hw75)';
+const USER_AGENT = 'hw75-core/0.3 (+https://github.com/hellowordkb/hw75)';
 
 /*
  * Open-Meteo WMO weather code to our EinkWeatherIcon enum.

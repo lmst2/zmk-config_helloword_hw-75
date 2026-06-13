@@ -18,12 +18,12 @@ HW-75 由键盘主体 (Keyboard) 与扩展模块 (Dynamic) 组成。详细说明
 
 ## 仓库结构与构建 / Repository layout & building
 
-本仓库不只是编译配置，还内含**魔改 ZMK 固件源码**与**配套上位机**。四个子树：
+本仓库不只是编译配置，还内含**魔改 ZMK 固件源码**与**配套中枢**。四个子树：
 
-* `config/` — Zephyr module：板级定义、自定义驱动、app 层 C 代码、protobuf 协议（`proto/usb_comm.proto` 是固件与上位机共用的唯一协议源）
+* `config/` — Zephyr module：板级定义、自定义驱动、app 层 C 代码、protobuf 协议（`proto/usb_comm.proto` 是固件与中枢共用的唯一协议源）
 * `deps/zmk/` — vendored 的魔改 ZMK 分支（CI 与本地编译都用这份，不再外拉上游）
-* `deps/zmkx.app/` — vendored 的 Vue3 上位机（浏览器配置界面）
-* `tools/hw75-helper/` — Windows 本地 helper 服务
+* `deps/zmkx.app/` — vendored 的 Vue3 中枢（浏览器配置界面）
+* `tools/hw75-core/` — Windows 本地 helper 服务
 
 两块硬件目标共享同一套代码：`hw75_keyboard`（STM32F103XB，主键盘 + TouchBar）与 `hw75_dynamic`（STM32F405XG，旋钮 + 墨水屏扩展模块）。
 
@@ -35,7 +35,7 @@ py -3.12 -m west build -p always -s deps/zmk/app -d build\keyboard12 `
     -- "-DZMK_CONFIG=$PWD/config" "-DKEYMAP_FILE=$PWD/config/hw75_keyboard.keymap"
 ```
 
-上位机：`cd deps/zmkx.app && npm ci && npm run dev`（vite dev on :8080）。
+中枢：`cd deps/zmkx.app && npm ci && npm run dev`（vite dev on :8080）。
 
 > **贡献者 / AI agent 请先读 [`AGENTS.md`](AGENTS.md)** —— 架构与构建的权威指南；[`CLAUDE.md`](CLAUDE.md) 是它的精简入口。
 

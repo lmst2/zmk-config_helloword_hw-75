@@ -111,7 +111,7 @@
           </a-descriptions>
           <a-space wrap :class="$style.helperManagerActions">
             <a-button size="small" @click="functionSlotStore.refreshHelperCatalog()">刷新状态</a-button>
-            <a-button size="small" :disabled="!helperAvailable || helperRestarting" :loading="helperRestarting" @click="restartHelperService">重启 Helper</a-button>
+            <a-button size="small" :disabled="!helperAvailable || helperRestarting" :loading="helperRestarting" @click="restartHelperService">重启中枢</a-button>
           </a-space>
         </a-card>
 
@@ -265,11 +265,11 @@
                 v-if="!helperAvailable"
                 type="warning"
                 show-icon
-                message="本地 helper 未连接"
-                description="Helper 动作需要先启动 tools/hw75-helper。"
+                message="中枢未连接"
+                description="中枢动作需要先启动 tools/hw75-core。"
                 :class="$style.helperAlert"
               />
-              <div :class="$style.sectionTitle">Helper 动作</div>
+              <div :class="$style.sectionTitle">中枢动作</div>
               <div :class="$style.paletteGrid">
                 <button
                   v-for="action in helperCatalog"
@@ -392,7 +392,7 @@ const slotTypeOptions = [
   { label: '单按键功能', value: 'single' },
   { label: '组合键', value: 'combo' },
   { label: '宏序列', value: 'macro' },
-  { label: 'Helper 动作', value: 'helper' },
+  { label: '中枢动作', value: 'helper' },
 ] as const;
 
 const modifierOptions = FUNCTION_SLOT_MODIFIERS;
@@ -475,7 +475,7 @@ function slotEditorModeLabel(slot?: FunctionSlotDraft): string {
     case 'macro':
       return '宏序列';
     case 'helper':
-      return 'Helper 动作';
+      return '中枢动作';
   }
 }
 
@@ -842,7 +842,7 @@ function selectHelperAction(code: number): void {
     actionCode: code,
     helperPayload: {
       ...(slot.helperPayload ?? {}),
-      displayName: action?.displayName ?? 'Helper 动作',
+      displayName: action?.displayName ?? '中枢动作',
     },
   }));
 }
@@ -856,7 +856,7 @@ function updateHelperPayload(key: string, value: string): void {
     helperPayload: {
       ...(slot.helperPayload ?? {}),
       [key]: value,
-      displayName: selectedHelperAction.value?.displayName ?? slot.helperPayload?.displayName ?? 'Helper 动作',
+      displayName: selectedHelperAction.value?.displayName ?? slot.helperPayload?.displayName ?? '中枢动作',
     },
   }));
 }
@@ -925,7 +925,7 @@ function onSlotDrop(slotIndex: number | undefined, event: DragEvent): void {
       actionCode: payload.code,
       helperPayload: {
         ...(slot.helperPayload ?? {}),
-        displayName: action?.displayName ?? 'Helper 动作',
+        displayName: action?.displayName ?? '中枢动作',
       },
     }));
     selectedSlotIndex.value = slotIndex;
@@ -977,10 +977,10 @@ async function applyDraft(): Promise<void> {
 async function restartHelperService(): Promise<void> {
   try {
     await functionSlotStore.restartLocalHelper();
-    message.success('Helper 已重启并恢复连接');
+    message.success('中枢已重启并恢复连接');
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
-    message.error(`Helper 重启失败: ${text}`);
+    message.error(`中枢重启失败: ${text}`);
   }
 }
 
@@ -990,7 +990,7 @@ async function exportProfiles(): Promise<void> {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = 'hw75-helper-profiles.json';
+  anchor.download = 'hw75-core-profiles.json';
   anchor.click();
   URL.revokeObjectURL(url);
   message.success('已导出 Helper 配置');

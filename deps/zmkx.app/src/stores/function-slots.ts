@@ -139,22 +139,22 @@ export const useFunctionSlotStore = defineStore('function-slots', () => {
 
     if (!helperAvailable.value) {
       helperCatalog.value = [];
-      helperError.value = '本地 helper 未连接，请运行 start-hw75-dev.cmd';
+      helperError.value = '中枢未连接，请运行 start-hw75-dev.cmd';
       return;
     }
 
     helperCatalog.value = await getHelperCatalog();
-    helperError.value = helperVersionMatches.value ? undefined : `helper 版本不匹配，期望 ${helperExpectedVersion.value}`;
+    helperError.value = helperVersionMatches.value ? undefined : `中枢版本不匹配，期望 ${helperExpectedVersion.value}`;
   }
 
   async function restartLocalHelper(): Promise<void> {
     if (!helperAvailable.value) {
-      throw new Error('当前浏览器版无法拉起已离线的本地 helper，请运行 start-hw75-dev.cmd');
+      throw new Error('当前浏览器版无法拉起已离线的中枢，请运行 start-hw75-dev.cmd');
     }
 
     helperRestarting.value = true;
     helperAvailable.value = false;
-    helperError.value = '正在重启本地 helper...';
+    helperError.value = '正在重启中枢...';
 
     try {
       await restartHelper();
@@ -169,11 +169,11 @@ export const useFunctionSlotStore = defineStore('function-slots', () => {
         helperAvailable.value = true;
         helperVersion.value = health.version;
         helperCatalog.value = await getHelperCatalog();
-        helperError.value = helperVersionMatches.value ? undefined : `helper 版本不匹配，期望 ${helperExpectedVersion.value}`;
+        helperError.value = helperVersionMatches.value ? undefined : `中枢版本不匹配，期望 ${helperExpectedVersion.value}`;
         return;
       }
 
-      throw new Error('helper 重启后未在预期时间内恢复连接');
+      throw new Error('中枢重启后未在预期时间内恢复连接');
     } catch (error) {
       helperAvailable.value = false;
       helperError.value = error instanceof Error ? error.message : String(error);
@@ -228,12 +228,12 @@ export const useFunctionSlotStore = defineStore('function-slots', () => {
         const next = cloneFunctionSlotDraft(slot);
         if (next.slotType === UsbComm.FunctionSlotType.FUNCTION_SLOT_HELPER_ACTION) {
           if (!helperAvailable.value) {
-            throw new Error('本地 helper 未连接，无法写入 Helper 动作');
+            throw new Error('中枢未连接，无法写入中枢动作');
           }
 
           const catalogEntry = helperCatalog.value.find((item) => item.code === next.actionCode);
           if (!catalogEntry) {
-            throw new Error(`未知的 Helper 动作码: ${next.actionCode}`);
+            throw new Error(`未知的中枢动作码: ${next.actionCode}`);
           }
 
           const profile = await upsertHelperProfile({
@@ -381,7 +381,7 @@ export const useFunctionSlotStore = defineStore('function-slots', () => {
       .catch((error) => {
         const text = error instanceof Error ? error.message : String(error);
         helperAvailable.value = false;
-        helperError.value = '本地 helper 请求失败，请重启 tools/hw75-helper';
+        helperError.value = '中枢请求失败，请重启 tools/hw75-core';
         pushHelperActivity(normalized.map((event) => ({
           seq: event.seq,
           slotIndex: event.slotIndex,
@@ -391,7 +391,7 @@ export const useFunctionSlotStore = defineStore('function-slots', () => {
           error: text,
           createdAt: Date.now(),
         })));
-        message.error(`Helper 桥接请求失败: ${text}`);
+        message.error(`中枢桥接请求失败: ${text}`);
       });
   }
 

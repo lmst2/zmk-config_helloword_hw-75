@@ -15,7 +15,7 @@
 1. Dynamic 墨水屏从"单张图上传"扩展成**多模式**（静态图 / 幻灯片 / 时间+天气 / 可扩展）
 2. Dynamic 两颗按键**长按切换**模式
 3. 电机旋钮**零点校准**
-4. helper 升级成"上位机 core"（node-hid 直连键盘 + WebSocket 代理网页）
+4. helper 升级成"中枢 core"（node-hid 直连键盘 + WebSocket 代理网页）
 5. 最终数据流：`keyboard ⇄ helper-core ⇄ webapp`（不再 `keyboard ⇄ webapp ⇄ helper`）
 
 整体大功能链路已经打通，但 **最后一轮用户反馈仍有一个关键问题未验证完**：
@@ -46,7 +46,7 @@
 | UART 连接 | keyboard USART1 TX-only (PA9, 115200) → dynamic RX，单向 |
 | Dynamic RTC | **没有**（DTS 无 rtc 节点、无 LSE 晶振、无 Vbat）—— 软时钟靠 helper 同步 |
 | 日常编译 | `py -3.12 -m west build -p always -s deps/zmk/app -d build\<dir> -b "<board>@<rev>" -- "-DZMK_CONFIG=E:/code/zmk-config_helloword_hw-75/config" "-DKEYMAP_FILE=..."` |
-| 上位机编译 | `cd deps/zmkx.app && node ./build-proto.mjs && npx vite build`（**别用 `npm run`，在这台机器上会卡**）|
+| 中枢编译 | `cd deps/zmkx.app && node ./build-proto.mjs && npx vite build`（**别用 `npm run`，在这台机器上会卡**）|
 | helper 依赖 | `node-hid`, `ws`, `protobufjs` |
 | 启动开发环境 | `powershell -ExecutionPolicy Bypass -File .\start-hw75-dev.ps1` （已升级为"自动杀旧进程再起"）|
 
@@ -57,7 +57,7 @@
 ### 2.1 架构变迁（见 [AGENTS.md §1.1](AGENTS.md)）
 
 - **目标**：`keyboard ⇄ helper-core (node) ⇄ webapp (Vue)`
-- **命名**：`tools/hw75-helper` 未来叫"上位机 core"，`deps/zmkx.app` 未来叫"上位机 UI"
+- **命名**：`tools/hw75-core` 未来叫"中枢 core"，`deps/zmkx.app` 未来叫"中枢 UI"
 - **迁移边界（当前状态）**：
   - 新功能（eink 多模式、时钟天气、knob 零点、未来 CPU 使用率等）**必须走 helper-core 新链路**（`stores/helperCore.ts::sendViaCore`）
   - 旧功能（RGB、knob_prefs、touchbar、function_slots、debug_log）暂保留 WebHID 直连，下次专门任务再迁移
@@ -182,11 +182,11 @@
   - 关掉后 SRAM 98.01%（20072/20480B），margin ~400B，和历史稳定版同水位
   - 代价仅：dynamic 状态 OLED 上少一个 "FN 层" 小指示符。keyboard 核心功能**不受影响**。
 
-### 3.4 Helper (tools/hw75-helper)
+### 3.4 Helper (tools/hw75-core)
 
 - **`package.json`**：version 0.3.0，新 deps：`node-hid`, `ws`, `protobufjs`
 - **`src/server.mjs`**：整合所有模块，新增 `GET /api/helper-core/status`，启动时挂 WebSocket
-- **`src/protoLoader.mjs`**（新）：**运行时**读 `config/proto/usb_comm.proto`，用正则剥除 `import "nanopb.proto"` / `[(nanopb)...]` / `option (nanopb_msgopt)...` 后交给 `protobufjs.parse`。**不依赖**上位机生成的 `comm.proto.js`（那份 ESM 在 node 里会触发 `protobufjs/minimal` 解析问题）
+- **`src/protoLoader.mjs`**（新）：**运行时**读 `config/proto/usb_comm.proto`，用正则剥除 `import "nanopb.proto"` / `[(nanopb)...]` / `option (nanopb_msgopt)...` 后交给 `protobufjs.parse`。**不依赖**中枢生成的 `comm.proto.js`（那份 ESM 在 node 里会触发 `protobufjs/minimal` 解析问题）
 - **`src/keyboard.mjs`**（新）
   - `node-hid` 连接，**按 product name 含 "dynamic" 过滤**
   - 启动枚举时打印所有 HW-75 HID 接口（product / usagePage / interface / path），方便排查
@@ -194,11 +194,11 @@
   - 单 slot 串行化（与 keyboard 固件的 usb_comm 单 RX slot 对称）
   - 超时 2000ms，失败自动重连
 - **`src/bus.mjs`**（新）：WebSocket 桥，二进制帧 `[type(1) | req_id(4) | body]` 走 H2D/D2H，文本 JSON 走 status/config/events
-- **`src/coreConfig.mjs`**（新）：持久化 `%APPDATA%\hw75-helper\core-config.json`（weather/clock 配置）
+- **`src/coreConfig.mjs`**（新）：持久化 `%APPDATA%\hw75-core\core-config.json`（weather/clock 配置）
 - **`src/weather.mjs`**（新）：open-meteo API，10min 拉一次 → 编码 `EINK_PUSH_WEATHER` 推给键盘
 - **`src/clock.mjs`**（新）：每分钟边界 push
 
-### 3.5 上位机 (deps/zmkx.app)
+### 3.5 中枢 (deps/zmkx.app)
 
 - **新 stores**：
   - `src/stores/helperCore.ts` - WebSocket 客户端，`sendViaCore(h2d)` 返回 `Promise<MessageD2H>`，`onKeyboardEvent(cb)` 订阅异步事件
@@ -257,7 +257,7 @@
 
 改 callback 后 `EinkModeConfig` 只剩 `pb_callback_t modes` (8B) + 少量 flag，整体 ~24B。union max 回落到 `TouchbarConfig` (~360B)。
 
-**规则**：任何 repeated 字段默认走 callback；只有真需要简单同步访问才加 `max_count`。上位机侧（protobufjs）对 callback 透明，TS 类型完全不变。
+**规则**：任何 repeated 字段默认走 callback；只有真需要简单同步访问才加 `max_count`。中枢侧（protobufjs）对 callback 透明，TS 类型完全不变。
 
 ### 4.2 为什么 knob 零点不能调 motor FOC
 
@@ -346,7 +346,7 @@ Dynamic STM32F405XG 虽然芯片有 RTC 外设，但 DTS 没有 rtc 节点，硬
 | keyboard@1.2 | `build/keyboard12_fix/zephyr/zmk.uf2` | 72.38% | **98.01%**（20072/20480） |
 | dynamic@B | `build/dynamicB/zephyr/zmk.uf2` | 56.80% | 58.85%（77136/131072） |
 
-上位机无需重建产物（只改了 i18n 和 UI 逻辑，用户用 `npm run dev` 跑就是最新）。
+中枢无需重建产物（只改了 i18n 和 UI 逻辑，用户用 `npm run dev` 跑就是最新）。
 
 ---
 
@@ -374,7 +374,7 @@ Dynamic STM32F405XG 虽然芯片有 RTC 外设，但 DTS 没有 rtc 节点，硬
 
 ### 7.3 产品愿景路线图（来自用户原话）
 
-> "现在他叫 helper，后面他就应该叫上位机 core 了，现在的所谓上位机，以后只不过是我们真正完整版上位机的 ui 组件。"
+> "现在他叫 helper，后面他就应该叫中枢 core 了，现在的所谓中枢，以后只不过是我们真正完整版中枢的 ui 组件。"
 
 - helper-core 持有业务状态；webapp 只做展示
 - 以后比如键盘实时获取 CPU 使用率：helper 自己查、发给键盘、同时推给 webapp 展示
@@ -434,7 +434,7 @@ Dynamic STM32F405XG 虽然芯片有 RTC 外设，但 DTS 没有 rtc 节点，硬
 
 ### 9.2 helper node-hid reportId 修复
 
-`tools/hw75-helper/src/keyboard.mjs::handleRx` 原本没剥 HID report id 前缀（Windows `node-hid` 对 numbered reports 会保留 `data[0] = reportId`，和 WebHID 自动剥离的行为不一致），导致所有 D2H 响应 decode 失败，表现为 `[clock] push failed: Action 26 response timeout` + `decode failed: missing required 'action'` 循环。修改后 `handleRx` 按 `data.length > HID_REPORT_SIZE` 判断是否有 reportId 并跳过，问题 3 彻底消除。
+`tools/hw75-core/src/keyboard.mjs::handleRx` 原本没剥 HID report id 前缀（Windows `node-hid` 对 numbered reports 会保留 `data[0] = reportId`，和 WebHID 自动剥离的行为不一致），导致所有 D2H 响应 decode 失败，表现为 `[clock] push failed: Action 26 response timeout` + `decode failed: missing required 'action'` 循环。修改后 `handleRx` 按 `data.length > HID_REPORT_SIZE` 判断是否有 reportId 并跳过，问题 3 彻底消除。
 
 ### 9.3 本轮 commit 范围 vs 工作目录暂存
 
@@ -445,13 +445,13 @@ Dynamic STM32F405XG 虽然芯片有 RTC 外设，但 DTS 没有 rtc 节点，硬
 
 **仍在工作目录暂存**（owner 未来决定如何打包）：
 
-- `tools/hw75-helper/`：整个目录从未 track 过。本轮虽然修复了 `keyboard.mjs` 的 reportId 问题，但 `server.mjs / bus.mjs / coreConfig.mjs / protoLoader.mjs / weather.mjs / clock.mjs` 都是前一轮引入且未 commit，`keyboard.mjs` 依赖它们。要 commit 就得整个目录一次 add，属于 owner 级决策，本轮不碰。
+- `tools/hw75-core/`：整个目录从未 track 过。本轮虽然修复了 `keyboard.mjs` 的 reportId 问题，但 `server.mjs / bus.mjs / coreConfig.mjs / protoLoader.mjs / weather.mjs / clock.mjs` 都是前一轮引入且未 commit，`keyboard.mjs` 依赖它们。要 commit 就得整个目录一次 add，属于 owner 级决策，本轮不碰。
 - `deps/`（vendored ZMK + zmkx.app）：同上，从未 track。
 - 其余 untracked：`MIGRATION_*.md`, `start-hw75-dev.{cmd,ps1}`, `west.yml`, `config/app/{diag_log,function_slot,touchbar,rgb_effects}.c`, `config/boards/arm/hw75_dynamic/app/{eink_mode,eink_render}.c`, 大量 `config/dts/behaviors/*.dtsi` 等 —— 都是前几轮对话遗留，本轮不整合。
 
 ### 9.4 仍未验证（不确定改动后是否有回归 bug）
 
-刷 `keyboard12_v5` + `dynamicB_v2` 后，下列功能**代码路径已换**但**还没上位机交互实测**：
+刷 `keyboard12_v5` + `dynamicB_v2` 后，下列功能**代码路径已换**但**还没中枢交互实测**：
 
 - **TouchBar UI**：`TOUCHBAR_GET_CONFIG / SET_CONFIG` 现在走 callback，请验证 Touchbar.vue 页能读出配置、改参数保存后再读回值一致
 - **Function Slot UI**：5 个 slot 配置的 GET/SET、HID preset 列表、trigger event 日志

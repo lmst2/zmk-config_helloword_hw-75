@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$helperDir = Join-Path $repoRoot 'tools\hw75-helper'
+$helperDir = Join-Path $repoRoot 'tools\hw75-core'
 $appDir = Join-Path $repoRoot 'deps\zmkx.app'
 $helperUrl = 'http://127.0.0.1:8755/api/health'
 $frontendUrl = 'http://127.0.0.1:8080/'
@@ -101,20 +101,20 @@ if ($NoRestart) {
   Write-Host '启动 HW75 开发环境...'
 } else {
   Write-Host '重启 HW75 开发环境...'
-  Stop-ManagedService -displayName 'HW75 Helper' -matchText 'hw75-helper' -port $helperPort
+  Stop-ManagedService -displayName 'HW75 中枢' -matchText 'hw75-core' -port $helperPort
   Stop-ManagedService -displayName '前端开发服务器' -matchText 'vite' -port $frontendPort
 }
 
-Start-ManagedProcess -displayName 'HW75 Helper' -workingDirectory $helperDir -arguments @('run', 'start')
+Start-ManagedProcess -displayName 'HW75 中枢' -workingDirectory $helperDir -arguments @('run', 'start')
 Start-ManagedProcess -displayName '前端开发服务器' -workingDirectory $appDir -arguments @('run', 'dev')
 
 $helperReady = Wait-HttpOk -url $helperUrl -timeoutSeconds 10
 $frontendReady = Wait-HttpOk -url $frontendUrl -timeoutSeconds 15
 
 if ($helperReady) {
-  Write-Host "Helper 就绪: $helperUrl"
+  Write-Host "中枢就绪: $helperUrl"
 } else {
-  Write-Warning "Helper 未在预期时间内就绪: $helperUrl"
+  Write-Warning "中枢未在预期时间内就绪: $helperUrl"
 }
 
 if ($frontendReady) {

@@ -10,7 +10,7 @@ as ONE coherent system. No feature dropped. The only external dependency is one 
 ## 1. Vision
 
 HW-75 becomes a **context-aware desk system**:
-- **中枢** (the PC host app, renamed from `hw75-helper`) is the brain — it senses what you're
+- **中枢** (the PC host app, renamed from `hw75-core`) is the brain — it senses what you're
   doing (foreground app, media, system state) and orchestrates both boards.
 - The two boards **also collaborate directly over UART**, so the device stays alive and
   expressive **with no PC attached** (haptic feedback to typing, TouchBar-as-remote, activity wake).
@@ -60,9 +60,9 @@ USB handler (PC) and the UART handler (local). Never two parallel systems.
 ## 5. Naming
 
 Brand **中枢** (Zhōngshū, "nerve center"); pairs with 瀚文 ("瀚文中枢"). In code, retire the word
-`helper`; keep the existing `core` link-layer convention. `hw75-helper` → host app package;
+`helper`; keep the existing `core` link-layer convention. `hw75-core` → host app package;
 `helperCore.ts` → `coreClient.ts` / `useCore`; wire-contract strings (port 8755, `/ws`, `/api/*`,
-frame bytes 0x01–0x04, version) change on both ends in lockstep; migrate `%APPDATA%\hw75-helper`.
+frame bytes 0x01–0x04, version) change on both ends in lockstep; migrate `%APPDATA%\hw75-core`.
 
 ## 6. Unified protocol additions
 

@@ -193,7 +193,7 @@ export function slotTypeLabel(value: number): string {
     case 3:
       return '宏序列';
     case 4:
-      return 'Helper 动作';
+      return '中枢动作';
     default:
       return '未知';
   }

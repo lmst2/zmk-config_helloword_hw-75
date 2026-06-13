@@ -7,7 +7,7 @@ const HELPER_WS_URL = 'ws://127.0.0.1:8755/ws';
 const REQUEST_TIMEOUT_MS = 2500;
 const RECONNECT_DELAY_MS = 1000;
 
-// Binary WS frame types — wire contract; must match tools/hw75-helper/src/bus.mjs.
+// Binary WS frame types — wire contract; must match tools/hw75-core/src/bus.mjs.
 const FRAME_SEND_REQUEST = 0x01;
 const FRAME_SEND_RESPONSE = 0x02;
 const FRAME_SEND_ERROR = 0x03;

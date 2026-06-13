@@ -9,12 +9,12 @@
 
 ## 1. 项目定位（一句话）
 
-这是 HelloWord HW-75 模块化机械键盘的 **ZMK 固件 + 上位机配置应用**的一体化仓库，同时承担：
+这是 HelloWord HW-75 模块化机械键盘的 **ZMK 固件 + 中枢配置应用**的一体化仓库，同时承担：
 
 - Zephyr **module/config 仓**（板子定义、驱动、app 代码、protobuf）
 - **vendored ZMK 分支**（`deps/zmk`，本地魔改过）
-- **vendored 上位机 Vue 应用**（`deps/zmkx.app`）
-- **Windows 端本地 helper 服务**（`tools/hw75-helper`）
+- **vendored 中枢 Vue 应用**（`deps/zmkx.app`）
+- **Windows 端本地 helper 服务**（`tools/hw75-core`）
 - **GitHub Actions CI** 基于 vendored 的 `deps/zmk` 编译，不再外拉 `xingrz/zmk`
 
 两款硬件目标：
@@ -32,7 +32,7 @@
 
 ## 1.1 产品架构演进目标（**所有新功能先读这段**）
 
-当前仓库里 `tools/hw75-helper` 在产品语义上是"上位机 core"（下一步会改名），`deps/zmkx.app` 是"上位机 UI"。两者关系已规划迁移到新链路：
+当前仓库里 `tools/hw75-core` 在产品语义上是"中枢 core"（下一步会改名），`deps/zmkx.app` 是"中枢 UI"。两者关系已规划迁移到新链路：
 
 - **目标数据流**：`keyboard ⇄ helper-core ⇄ webapp`（helper 居中），而非历史的 `keyboard ⇄ webapp ⇄ helper`。
 - **helper-core 职责**：用 `node-hid` 直连键盘并维持唯一 USB 会话；持有业务状态；跑定时任务（天气 10min、时钟 1min 等）；主动向键盘推数据；订阅键盘异步事件；对网页提供 WebSocket（`ws://127.0.0.1:8755/ws`）代理 H2D/D2H 消息并广播事件。
@@ -59,7 +59,7 @@
 │   ├── hw75_dynamic.keymap          dynamic keymap (sensor-binding 风格)
 │   │
 │   ├── proto/
-│   │   ├── usb_comm.proto           ★★★ 通信协议唯一源（固件+上位机共用）
+│   │   ├── usb_comm.proto           ★★★ 通信协议唯一源（固件+中枢共用）
 │   │   ├── uart_comm.proto          keyboard → dynamic SLIP 联动协议（独立于 usb_comm）
 │   │   ├── usb_comm.keyboard.options ★ per-board nanopb 选项：FT_IGNORE dynamic-only + FT_CALLBACK 大 payload
 │   │   └── usb_comm.dynamic.options  ★ per-board nanopb 选项：FT_IGNORE keyboard-only
@@ -144,7 +144,7 @@
 │   ├── zmk/                         魔改 ZMK，CI/本地 build 都用这里
 │   │   └── app/src/rgb_underglow.c  ★ 已加 __weak hook：
 │   │       zmk_rgb_underglow_custom_effect_{count,mask,render}
-│   └── zmkx.app/                    Vue3 + Pinia + ant-design-vue 上位机
+│   └── zmkx.app/                    Vue3 + Pinia + ant-design-vue 中枢
 │       ├── package.json / vite.config.js
 │       ├── build-proto.mjs          ★ 直接读 config/proto/usb_comm.proto 生成 TS
 │       ├── build-keyboard-config.mjs  Keyboard 页面键位表生成
@@ -164,9 +164,9 @@
 │       │   ├── Motor.vue / MotorDemo.vue / MotorPrefs.vue
 │       │   ├── Touchbar.vue / Debug.vue
 │       ├── src/pages/Main.vue           ★ 侧栏可见性由 Version.Features 决定
-│       └── src/utils/helper-bridge.ts   与 hw75-helper HTTP API 的类型契约
+│       └── src/utils/helper-bridge.ts   与 hw75-core HTTP API 的类型契约
 │
-├── tools/hw75-helper/               ★ Windows 本地 helper（浏览器上位机→本机动作桥）
+├── tools/hw75-core/               ★ Windows 本地 helper（浏览器中枢→本机动作桥）
 │   └── src/server.mjs               127.0.0.1:8755 HTTP，动作表在顶部 ACTIONS
 │
 ├── .github/workflows/build.yml      ★ CI：矩阵 4 板 + host app + release
@@ -212,7 +212,7 @@ py -3.12 -m west build -p always -s deps/zmk/app -d build\dynamicB `
 - protobuf python **必须锁 `4.25.3`**（nanopb 0.4.x plugin 需要 `<5`）。
 - 产物命名：`firmware-<board>-zmk.uf2` / `.hex` / `.bin`。
 
-### 3.3 上位机编译
+### 3.3 中枢编译
 
 ```powershell
 cd deps/zmkx.app
@@ -221,12 +221,12 @@ npm run dev            # vite dev：http://localhost:8080
 npm run build          # 输出 deps/zmkx.app/dist
 ```
 
-- **改了 `config/proto/usb_comm.proto` 必须 `npm run build:proto`**，否则上位机枚举漂移。
+- **改了 `config/proto/usb_comm.proto` 必须 `npm run build:proto`**，否则中枢枚举漂移。
 - **改了 `config/hw75_keyboard.keymap` 涉及 Keyboard 页默认值时，要 `npm run build:keyboard`**。
 
 ### 3.4 开发一键起
 
-`start-hw75-dev.ps1`：起 `hw75-helper`（8755）和 vite dev（8080），有去重 +健康检查。
+`start-hw75-dev.ps1`：起 `hw75-core`（8755）和 vite dev（8080），有去重 +健康检查。
 
 ---
 
@@ -234,7 +234,7 @@ npm run build          # 输出 deps/zmkx.app/dist
 
 ### 4.1 协议源：`config/proto/usb_comm.proto`
 
-- 包名 `usb.comm`，固件用 nanopb（生成 `usb_comm.pb.{h,c}`），上位机 JS/TS 直接读这份 `.proto`。
+- 包名 `usb.comm`，固件用 nanopb（生成 `usb_comm.pb.{h,c}`），中枢 JS/TS 直接读这份 `.proto`。
 - 顶层消息：`MessageH2D`（host→device）、`MessageD2H`（device→host），都是 `action + oneof payload` 结构。
 - 改任何一个枚举、字段、oneof，都**同时影响**：
   1. `config/app/usb_comm/handler/handler_*.c`（固件 handler）
@@ -246,7 +246,7 @@ npm run build          # 输出 deps/zmkx.app/dist
 
 ### 4.2 Action/枚举 同步表（不同步必然出 bug）
 
-| 固件侧 (`app/diag_log.h`)            | proto (`usb_comm.proto`)                 | 上位机 (`debug_decode.ts`)     |
+| 固件侧 (`app/diag_log.h`)            | proto (`usb_comm.proto`)                 | 中枢 (`debug_decode.ts`)     |
 | ------------------------------------ | ---------------------------------------- | ------------------------------ |
 | `hw75_diag_level`                    | `LogLevel`                               | `levelText`                    |
 | `hw75_diag_module`                   | `LogModule`                              | `moduleText` / `moduleColor`   |
@@ -262,13 +262,13 @@ npm run build          # 输出 deps/zmkx.app/dist
 | 约束                                     | 地点                                                    | 违反后果                  |
 | ---------------------------------------- | ------------------------------------------------------- | ------------------------- |
 | **单 RX 槽**：`usb_rx_buf`+sem(max 1)    | `usb_comm_proto.c`                                      | 请求覆盖/报错漂移         |
-| **上位机必须全局串行化请求**             | `stores/usb.ts` 的 `requestQueue + activePendingRequest`| 固件行为不定              |
+| **中枢必须全局串行化请求**             | `stores/usb.ts` 的 `requestQueue + activePendingRequest`| 固件行为不定              |
 | **TX 共享 `tx_buf`：先等 sem 再填**       | `usb_comm_hid.c::usb_comm_hid_send()`                   | 多包响应乱码              |
 | **`MessageH2D/D2H` 不能放栈**            | `usb_comm_proto.c` 的 `static usb_h2d_msg/usb_d2h_msg`  | 1 KB 线程栈溢出、键盘死机 |
 | **callback 编码必须读稳定拷贝**          | `handler_debug_log.c` 的 `ctx.events[]/boot_events[]`   | 多包响应成 "invalid wire type" |
 | **callback 字段仅在有数据时 attach**     | 同上，`snapshots`/`boot_events`                         | 空 callback 扰乱下一个 callback |
 | **repeated 字段不要同时 static+callback**| `.proto` 里 `LogEvents.events` 故意没有 `max_count`     | D2H 结构膨胀 → 栈溢出     |
-| **新增 feature 要在 Version.Features 上报** | `handler_version.c`                                  | 上位机侧栏不显示          |
+| **新增 feature 要在 Version.Features 上报** | `handler_version.c`                                  | 中枢侧栏不显示          |
 | **对方板不处理的 oneof 字段必须 FT_IGNORE** | `config/proto/usb_comm.{keyboard,dynamic}.options`    | 对方加 payload 会拖累本板 union size |
 | **keyboard 大 payload 走 FT_CALLBACK**   | 同上；`handler_touchbar.c`/`handler_function_slot.c` 写 encode/decode | keyboard 20KB SRAM 吃不下 |
 
@@ -305,7 +305,7 @@ Rgb.vue:toggle
 
 - **只用 `hw75_diag_log_event(...)` 和 `hw75_diag_update_snapshot(...)`**，不要自己打 ring。
 - event_id 新增：先在 `app/diag_log.h` 加 `HW75_DIAG_EVENT_*`，再在 `usb_comm.proto::LogEventId` 加同号，再在 `debug_decode.ts::decodeEvent` 写渲染逻辑。
-- 上位机 Debug 页面通过 `stores/debug.ts` 按 `LOG_GET_STATE` + `LOG_GET_EVENTS`（批量 4）轮询。
+- 中枢 Debug 页面通过 `stores/debug.ts` 按 `LOG_GET_STATE` + `LOG_GET_EVENTS`（批量 4）轮询。
 - 事件环大小由 `CONFIG_HW75_DIAG_LOG_RING_SIZE`（键盘默认 8），boot events 由 `CONFIG_HW75_DIAG_LOG_BOOT_EVENT_COUNT`。**不要轻易调大**，SRAM 很紧。
 
 ### 5.2 USB 通信框架 `usb_comm`
@@ -315,7 +315,7 @@ Rgb.vue:toggle
   2. `config/app/usb_comm/handler/handler_xxx.c`：实现函数，顶部 `USB_COMM_HANDLER_DEFINE(Action_XXX, MessageD2H_payload_xxx_tag, handle_xxx)`。
   3. `config/app/usb_comm/handler/CMakeLists.txt`：按 Kconfig feature 条件 `zephyr_library_sources_ifdef`。
 - handler 签名固定：`bool handle_xxx(const H2D*, D2H*, const void* bytes, uint32_t bytes_len)`。返回 `true` 才会设置响应 payload tag；返回 `false` 则响应变成空 Nop。
-- `handler_version.c` 里 **必须**给新 feature 加 `features.xxx = true; has_xxx = true`，否则上位机侧栏不会出现。
+- `handler_version.c` 里 **必须**给新 feature 加 `features.xxx = true; has_xxx = true`，否则中枢侧栏不会出现。
 - **per-board nanopb options**（`config/proto/usb_comm.{keyboard,dynamic}.options`，CMakeLists 按 `CONFIG_BOARD_*` 选一份 stage 到 build dir 为 `usb_comm.options`）：`.proto` 唯一源不变，但各板独立生成自己的 `usb_comm.pb.{h,c}`。两条用法：
   - **`type:FT_IGNORE`**：对方板的 oneof payload 从本板 union 里移除（encode/decode 层直接跳过，handler 根本不存在）。用来阻断跨板 proto 扩展的 SRAM 传染——dynamic 扩 eink_* 字段，keyboard 一个字节也不用付。
   - **`type:FT_CALLBACK`**：让单个字段（尤其是 `repeated`/嵌套 submessage）从"实体内嵌"退化成 8B `pb_callback_t`。encode 时 handler 主动挂 `funcs.encode`；decode 时由 `usb_comm_proto.c::h2d_callback` 的 submsg hook 挂 `funcs.decode`。参考 `handler_touchbar.c`（8 个子字段全 callback）和 `handler_function_slot.c`（3 个 repeated callback）。
@@ -344,15 +344,15 @@ Rgb.vue:toggle
 - 配置视图结构体：`struct hw75_touchbar_config_view`（`app/touchbar.h`）；与 `TouchbarConfig` proto 字段**一一映射**，通过 `touchbar_{get,set}_config_view()` 读写。
 - Keymap 用 `&tb_mode`（`dts/behaviors/touchbar_mode.dtsi` + `behavior_touchbar_mode.c`）切模式，默认绑在 FN 层某位。
 - 鼠标滚轮/Pan 通过 `hid_mouse.c` 的 `HID_2` 设备发出（**不要**动 `HID_0` 是键盘）。
-- 上位机页面 `routes/Touchbar.vue` 通过 `TOUCHBAR_GET_CONFIG`/`TOUCHBAR_SET_CONFIG` 读写，支持 N 段（≤6）；改段数/掩码字段时，proto 和 `app/include/app/touchbar.h::hw75_touchbar_config_view` 要同步。
+- 中枢页面 `routes/Touchbar.vue` 通过 `TOUCHBAR_GET_CONFIG`/`TOUCHBAR_SET_CONFIG` 读写，支持 N 段（≤6）；改段数/掩码字段时，proto 和 `app/include/app/touchbar.h::hw75_touchbar_config_view` 要同步。
 
 ### 5.5 Function Slot
 
 - 5 个位（`HW75_FUNCTION_SLOT_COUNT=5`），每位可配置为：HID preset / 组合键 / 宏（≤6步）/ helper 动作。
 - 固件入口 `app/function_slot.h`；设置持久化走 `zephyr settings`（`hw75/fn_slot/...`）。
 - Keymap 通过 `&fn_slot <index>`（`behavior_function_slot.c` + `dts/behaviors/function_slot.dtsi`）；每个 slot 支持 press/release 两个阶段。
-- 上位机 `stores/function-slots.ts` 维护 cache；events 通过 `FUNCTION_SLOT_TRIGGER_EVENT_GET` 轮询（batch 4），helper 动作码会被 `helper-bridge.ts` 发到本机 `hw75-helper`。
-- **新增 helper 动作**：同步改 `tools/hw75-helper/src/server.mjs::ACTIONS` 和 `deps/zmkx.app/src/utils/helper-bridge.ts::HelperActionCatalogItem` 列表。
+- 中枢 `stores/function-slots.ts` 维护 cache；events 通过 `FUNCTION_SLOT_TRIGGER_EVENT_GET` 轮询（batch 4），helper 动作码会被 `helper-bridge.ts` 发到本机 `hw75-core`。
+- **新增 helper 动作**：同步改 `tools/hw75-core/src/server.mjs::ACTIONS` 和 `deps/zmkx.app/src/utils/helper-bridge.ts::HelperActionCatalogItem` 列表。
 
 ### 5.6 Dynamic 专属
 
@@ -360,7 +360,7 @@ Rgb.vue:toggle
 - eink：`eink_app.c` + `drivers/display/ssd16xx.c` + `drivers/display/display_sw_rotate.c`；host 通过 `EINK_SET_IMAGE`（走 `bytes` 字段，最大 8192）。
 - OLED 状态屏：`app/screen/`（LVGL），字体子集由 `cmake/lv_font_conv.cmake` 在编译时生成。
 
-### 5.7 上位机（`deps/zmkx.app`）
+### 5.7 中枢（`deps/zmkx.app`）
 
 - 路由（`src/main.ts`）对应 `src/routes/*.vue`；**侧栏可见性统一由 `Version.Features` 驱动**（见 `Main.vue`）。加页面时，必须先在 Features 里加字段并让固件置位，否则别人连不上看不见。
 - **禁止**在页面里直接调 `comm.send`；都走对应 `stores/*.ts`，确保串行化语义。
@@ -396,12 +396,12 @@ Rgb.vue:toggle
 
 > 以下场景遵循：**先查是否已有 API → 再扩展 → 最后新写**。
 
-### 7.1 我要加一个固件状态给上位机展示
+### 7.1 我要加一个固件状态给中枢展示
 
 1. 想清楚归属哪个已有 store（`rgb`/`knob`/`touchbar`/`function-slots`/…），**优先扩展现有消息**而不是加 Action。
 2. 在 `usb_comm.proto` 扩 optional 字段（proto2 允许默认值缺省）。
 3. 固件 handler 填 `has_xxx = true; xxx = ...`。
-4. 上位机 `stores/*.ts` 的 `handleTransferIn` 处理 + `Vue` 里绑定。
+4. 中枢 `stores/*.ts` 的 `handleTransferIn` 处理 + `Vue` 里绑定。
 5. 跑一次 `npm run build:proto`。
 
 ### 7.2 我要加一个新的 USB Action（无法塞进已有消息时再考虑）
@@ -435,20 +435,20 @@ Rgb.vue:toggle
 
 ### 7.6 我要加一个 helper 动作（本机执行命令/打开 URL）
 
-1. `tools/hw75-helper/src/server.mjs::ACTIONS` 加一行（code 保持全局唯一、不复用老号）。
+1. `tools/hw75-core/src/server.mjs::ACTIONS` 加一行（code 保持全局唯一、不复用老号）。
 2. 实现同文件里的 `runAction(action, payload)` 分发分支（如果模式不同于已有）。
-3. 上位机 `utils/helper-bridge.ts::HelperActionCatalogItem` 保持结构一致；页面渲染由 `routes/Keyboard.vue`（function slot 编辑器）自动适配。
+3. 中枢 `utils/helper-bridge.ts::HelperActionCatalogItem` 保持结构一致；页面渲染由 `routes/Keyboard.vue`（function slot 编辑器）自动适配。
 
 ### 7.7 我要加一个诊断事件
 
-见 5.1。记住：`data0`/`data1` 是两个 uint32 数据位，跨字段打包用 `hw75_diag_pack_u8x4 / u16x2 / s16x2`（见 `diag_log.h`），上位机解码要对称拆。
+见 5.1。记住：`data0`/`data1` 是两个 uint32 数据位，跨字段打包用 `hw75_diag_pack_u8x4 / u16x2 / s16x2`（见 `diag_log.h`），中枢解码要对称拆。
 
 ---
 
 ## 8. 坑与反模式（**已经踩过、别重演**）
 
 1. **HID 设备 slot 冲突**：`HID_0` 是 ZMK 键盘主设备；TouchBar 鼠标一定要 `HID_2`（见 `hw75_keyboard_defconfig` 的 `CONFIG_USB_HID_DEVICE_COUNT=3`、`CONFIG_HW75_HID_MOUSE_DEVICE_NAME`）。
-2. **上位机不要并发多个请求**：必须过 `stores/usb.ts::send`；如果写了新 store，**禁止**直接 `comm.send(...)`。
+2. **中枢不要并发多个请求**：必须过 `stores/usb.ts::send`；如果写了新 store，**禁止**直接 `comm.send(...)`。
 3. **nanopb callback 写法**：
    - 先把数据拷贝到稳定数组（避免两次编码读不同源）。
    - 空数组就**不要**挂 callback（空 callback 会干扰后一个 callback）。
@@ -456,7 +456,7 @@ Rgb.vue:toggle
 4. **大结构不要塞线程栈**：`MessageH2D/D2H` 已经是 static；新加 handler 内部也要留意 `usb_comm_LogEvent[N]` 这种，优先进 `ctx`（handler 静态）。
 5. **诊断/临时代码必须打标记**：在 `handler_version.c` 的 `VER_APP` 后缀追加 `+xxx1` 之类（历史做法），并在 handoff 文档里登记；调查结束必须回退。
 6. **不要动没改的代码去"优化"**：遵守用户规则"只在必要时重构"；先复用、再扩展、最后新写。
-7. **改 proto 忘了 rebuild**：上位机和固件都读同一份 `.proto`，但生成产物独立（`comm.proto.{js,d.ts}` vs `usb_comm.pb.{c,h}`）。改完协议两边都要 rebuild。
+7. **改 proto 忘了 rebuild**：中枢和固件都读同一份 `.proto`，但生成产物独立（`comm.proto.{js,d.ts}` vs `usb_comm.pb.{c,h}`）。改完协议两边都要 rebuild。
 8. **led_strip_remap label**：`indicator.c` 靠 `STRIP_INDICATOR_LABEL="STATUS"` 从 `led_strip_remap` 解出 status 段；改了 DTS 里 `status { label = "STATUS"; }` 就会断。
 9. **keymap 里 6 个 touch 键留 `&none`**：TouchBar 已经被 74HC165 驱动独占原始态，keymap 里对应位置继续用 `&none` 保持矩阵完整，**不要**映射成真实按键。
 10. **SRAM 临界**：任何"为了简化加个 buffer"的想法，先看 handoff 里 `+stackcb1 / +stackcb2` 那段，有多次教训。
@@ -464,7 +464,7 @@ Rgb.vue:toggle
 12. **nanopb oneof 的 SRAM 陷阱 + 两个解耦工具**：`MessageH2D.payload` / `MessageD2H.payload` 是 `oneof`，nanopb 生成为 C `union`，**每个 static 实例 sizeof 取最大成员**。keyboard 20KB SRAM 极紧，如果 dynamic 在共享 `.proto` 里加一个大 payload（哪怕 keyboard 根本不处理它），keyboard 的 union 也会被撑大。共用 `.proto` 的两条破局工具（都走 per-board `.options`，见 §5.2）：
     - **`type:FT_IGNORE`**：某个 oneof 成员从本板生成的 C struct 里彻底消失——encode/decode 不生成、union 不占位、handler 不存在。用来让 keyboard 不为 dynamic-only 的 eink/knob/motor 付 SRAM；反过来也一样。
     - **`type:FT_CALLBACK`**：某个字段（`repeated` / 大嵌套 submessage）从"实体内嵌"退化成 8B `pb_callback_t`。真实数据住在 handler 的 static view，encode/decode 时流式读写。举例：`TouchbarConfig` 的 pan/app/desktop + 3 个 indicator + 2 个 masks 数组全 callback 后，它在 union 里从 ~340 B 降到 ~124 B（见 `handler_touchbar.c`）；老的 `EinkModeConfig.modes` / `LogEvents.events` 也是这套模式。
-    - **守则**：加新 oneof 成员 / 新 `repeated` 前先 `arm-zephyr-eabi-nm --size-sort build/<board>/zephyr/zmk.elf | findstr usb_.2._msg` 看当前 size；默认走 callback，**只有**真需要简单同步访问才用 `FT_STATIC` + `max_count`。`deps/zmkx.app` 和 `tools/hw75-helper` 都用 protobufjs 读同一份 `.proto`，对 `.options` 里的 FT_IGNORE/FT_CALLBACK 完全透明——上位机不需要任何改动。
+    - **守则**：加新 oneof 成员 / 新 `repeated` 前先 `arm-zephyr-eabi-nm --size-sort build/<board>/zephyr/zmk.elf | findstr usb_.2._msg` 看当前 size；默认走 callback，**只有**真需要简单同步访问才用 `FT_STATIC` + `max_count`。`deps/zmkx.app` 和 `tools/hw75-core` 都用 protobufjs 读同一份 `.proto`，对 `.options` 里的 FT_IGNORE/FT_CALLBACK 完全透明——中枢不需要任何改动。
 13. **keyboard HW75_UART_COMM：曾临时关闭，现已恢复 y**：2026-04 proto 扩展后 keyboard SRAM 落在 99.22%，dynamic 进 UF2 BL 触发 keyboard→dynamic uart_slip_send 峰值时栈越界，RGB 光效冻 + 按键失灵。当时作为快速修复把 `CONFIG_HW75_UART_COMM=n` 写入 defconfig。后通过 §5.2 的 per-board options + FT_CALLBACK 把 `usb_h2d_msg/d2h_msg` 从 368/356 B 砍到 156/144 B，SRAM 回落到 98.55%（margin ~296 B），UART link 稳定恢复。现在这条是 keyboard↔dynamic 所有联动功能的通道（FN 层状态、未来扩展），**不要**再关。
 
 ---
@@ -472,10 +472,10 @@ Rgb.vue:toggle
 ## 9. 工作流程约定
 
 1. **动手前先找引用**：`rg '<symbol>'` / `rg '<function_name>'`，或 `Grep` 工具。新实现前先确认没有现成实现。
-2. **改完检查残留**：删掉的函数/枚举/proto 字段在另一侧（固件↔上位机↔helper）如果还有引用，会编译过但运行错。
+2. **改完检查残留**：删掉的函数/枚举/proto 字段在另一侧（固件↔中枢↔helper）如果还有引用，会编译过但运行错。
 3. **本地验证最低线**：
    - 固件：`west build` 成功 + FLASH/SRAM 水位没有突然跳。
-   - 上位机：`npm run build` 成功 + 本地 `npm run dev` 打开无红字。
+   - 中枢：`npm run build` 成功 + 本地 `npm run dev` 打开无红字。
 4. **不要乱删 `MIGRATION_*.md` 条目**，它们是决策追溯。新重大结论可以在那里 append。
 5. **本文件（AGENTS.md）过时的块要更新**，不要让它和源码漂移。更新时只改相关段落，不做大重构。
 
@@ -486,13 +486,13 @@ Rgb.vue:toggle
 | 你想做                                   | 先去看                                                             |
 | ---------------------------------------- | ------------------------------------------------------------------ |
 | 加/改一个按键行为                        | `config/dts/behaviors/`、`config/app/behaviors/`、keymap 文件       |
-| 加/改一个上位机页面                      | `deps/zmkx.app/src/routes/`、`src/stores/`、`src/pages/Main.vue` 侧栏 |
+| 加/改一个中枢页面                      | `deps/zmkx.app/src/routes/`、`src/stores/`、`src/pages/Main.vue` 侧栏 |
 | 改 HID 报告                              | `config/app/hid_mouse.c`、`hw75_keyboard_defconfig`                  |
 | 改 RGB 效果                              | `config/app/rgb_effects.c`（自定义）、`deps/zmk/app/src/rgb_underglow.c`（stock） |
 | 改 TouchBar 时序/行为                    | `config/app/touchbar.c` 顶部 `#define`                              |
 | 改 TouchBar 配置协议                     | `usb_comm.proto::Touchbar*` + `app/touchbar.h` + `handler_touchbar.c` + `Touchbar.vue` |
 | 加一个 diag 事件                         | `app/diag_log.h` + `usb_comm.proto::LogEventId` + `debug_decode.ts` |
-| 加一个 helper 动作                       | `tools/hw75-helper/src/server.mjs` + `utils/helper-bridge.ts`       |
+| 加一个 helper 动作                       | `tools/hw75-core/src/server.mjs` + `utils/helper-bridge.ts`       |
 | 改板级 DTS                               | `config/boards/arm/hw75_*/*.dts`、对应 `*_X_X_X.overlay`            |
 | 改 Kconfig 选项                          | 板 `Kconfig.*` → 模块 `Kconfig` → `*_defconfig` 三路对齐            |
 | 加新板子 revision                        | 新 `.overlay` + `.conf` + `board.cmake`/`revision.cmake`            |

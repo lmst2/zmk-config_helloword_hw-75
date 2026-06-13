@@ -362,7 +362,7 @@ zh-Hans:
   slideshow-frames: 幻灯片帧
   frame-count: 帧数
   weather-config: 天气配置
-  helper-offline: 未连接到 helper-core，配置暂不可用
+  helper-offline: 未连接到中枢，配置暂不可用
   city: 城市（ASCII）
   latitude: 纬度
   longitude: 经度

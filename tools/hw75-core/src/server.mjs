@@ -18,8 +18,10 @@ import { Slots } from './slots.mjs';
 
 const HOST = '127.0.0.1';
 const PORT = 8755;
-const HELPER_VERSION = '0.3.0';
-const DATA_DIR = path.join(process.env.APPDATA || path.join(os.homedir(), '.config'), 'hw75-helper');
+const CORE_VERSION = '0.3.0';
+const APPDATA_BASE = process.env.APPDATA || path.join(os.homedir(), '.config');
+const DATA_DIR = path.join(APPDATA_BASE, 'hw75-core');
+const LEGACY_DATA_DIR = path.join(APPDATA_BASE, 'hw75-helper');
 const PROFILE_PATH = path.join(DATA_DIR, 'profiles.json');
 const CORE_CONFIG_PATH = path.join(DATA_DIR, 'core-config.json');
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
@@ -145,12 +147,12 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`);
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return json(res, 200, { ok: true, version: HELPER_VERSION });
+      return json(res, 200, { ok: true, version: CORE_VERSION });
     }
 
     if (req.method === 'GET' && url.pathname === '/api/helper-core/status') {
       return json(res, 200, {
-        version: HELPER_VERSION,
+        version: CORE_VERSION,
         keyboard: { connected: keyboard.isConnected(), path: keyboard.devicePath ?? null },
         keyboardBoard: { connected: keyboardBoard.isConnected(), path: keyboardBoard.devicePath ?? null },
         foreground: foreground.snapshot(),
@@ -196,7 +198,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && url.pathname === '/api/restart') {
       scheduleRestart();
-      return json(res, 200, { ok: true, restarting: true, version: HELPER_VERSION });
+      return json(res, 200, { ok: true, restarting: true, version: CORE_VERSION });
     }
 
     return json(res, 404, { error: 'Not found' });
@@ -214,8 +216,8 @@ weather.bus = bus;
 clock.bus = bus;
 
 server.listen(PORT, HOST, () => {
-  console.log(`[hw75-helper] listening on http://${HOST}:${PORT}`);
-  console.log(`[hw75-helper] WebSocket at ws://${HOST}:${PORT}/ws`);
+  console.log(`[hw75-core] listening on http://${HOST}:${PORT}`);
+  console.log(`[hw75-core] WebSocket at ws://${HOST}:${PORT}/ws`);
   keyboard.start();
   keyboardBoard.start();
   weather.start();
@@ -260,8 +262,30 @@ async function readJson(req) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
+async function migrateLegacyData() {
+  // One-time forward-migration from the pre-rename APPDATA folder
+  // (hw75-helper -> hw75-core), so existing profiles/config survive the rename.
+  for (const file of ['profiles.json', 'core-config.json']) {
+    const dest = path.join(DATA_DIR, file);
+    const src = path.join(LEGACY_DATA_DIR, file);
+    try {
+      await fs.access(dest);
+      continue; // new file already present — never clobber it
+    } catch {
+      /* dest missing -> try to bring the legacy one forward */
+    }
+    try {
+      await fs.copyFile(src, dest);
+      console.log(`[hw75-core] migrated ${file} from legacy hw75-helper data dir`);
+    } catch {
+      /* no legacy file; nothing to migrate */
+    }
+  }
+}
+
 async function ensureProfileState() {
   await fs.mkdir(DATA_DIR, { recursive: true });
+  await migrateLegacyData();
   try {
     const raw = await fs.readFile(PROFILE_PATH, 'utf8');
     const parsed = JSON.parse(raw);

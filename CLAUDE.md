@@ -15,7 +15,7 @@ A single repo that builds the firmware *and* companion app for the HelloWord **H
 - a **Zephyr module / ZMK config tree** (`config/` — board definitions, custom drivers, app-layer C code, protobuf);
 - a **vendored, locally-patched ZMK fork** (`deps/zmk/` — CI and local builds compile *this*, not upstream `xingrz/zmk`);
 - a **vendored Vue 3 + Pinia companion web app** (`deps/zmkx.app/`);
-- a **Windows helper service** (`tools/hw75-helper/`, evolving into a "helper-core" that proxies HID over WebSocket on `127.0.0.1:8755`).
+- a **Windows helper service** (`tools/hw75-core/`, evolving into a "helper-core" that proxies HID over WebSocket on `127.0.0.1:8755`).
 
 Two hardware targets share one codebase but expose different feature sets:
 
@@ -53,7 +53,7 @@ npm ci            # postinstall runs build:proto + build:keyboard
 npm run dev       # vite dev server on :8080
 npm run build     # -> deps/zmkx.app/dist
 
-# One-shot dev: starts hw75-helper (:8755) + vite dev (:8080) with health checks
+# One-shot dev: starts hw75-core (:8755) + vite dev (:8080) with health checks
 ./start-hw75-dev.ps1
 ```
 
@@ -86,7 +86,7 @@ Most of the difficulty here is not in any single file — it's in invariants tha
 | Diagnostic log | `hw75_diag_log_event()` / `hw75_diag_update_snapshot()` (`config/app/diag_log.c/.h`) | ring buffer; host polls via `LOG_GET_STATE`/`LOG_GET_EVENTS` |
 | RGB | `handler_rgb.c` (thin proto) + `config/app/rgb_effects.c` (custom effects via `deps/zmk` `__weak` `zmk_rgb_underglow_custom_effect_*` hooks) | keyboard layout = 103 LEDs (1.1 = 101); status LEDs only via `indicator.c` |
 | TouchBar | `config/app/touchbar.c` (6-channel gesture state machine, keyboard-only) | raw state from `kscan_gpio_74hc165.c`; keymap uses `&tb_mode`; mouse out via `hid_mouse.c` |
-| Function Slot | `config/app/function_slot.c` (5 slots) | keymap `&fn_slot <idx>`; helper actions bridge to `tools/hw75-helper` |
+| Function Slot | `config/app/function_slot.c` (5 slots) | keymap `&fn_slot <idx>`; helper actions bridge to `tools/hw75-core` |
 | Dynamic knob | `config/boards/arm/hw75_dynamic/app/knob_app.c` + `config/drivers/sensor/knob/` profiles | host `KNOB_GET/SET_CONFIG`, calibration |
 | Dynamic e-ink / OLED | `eink_app.c`, `drivers/display/ssd16xx.c`, LVGL `screen/` | `EINK_SET_IMAGE` (max 8192-byte `bytes`); fonts subset at build via `cmake/lv_font_conv.cmake` |
 | keyboard↔dynamic link | `config/drivers/console/uart_slip.c` + `uart_comm.proto` (separate from usb_comm) | `uart_slip_send` is non-blocking with a 20 ms total budget — see AGENTS.md pitfall #11; do **not** revert to busy-wait |
