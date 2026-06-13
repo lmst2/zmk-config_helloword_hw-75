@@ -396,10 +396,11 @@ export const useFunctionSlotStore = defineStore('function-slots', () => {
   }
 
   function startEventPolling(): void {
+    // The 中枢 (helper-core) now drains and executes function-slot triggers
+    // in-process (slots.mjs), so they fire even when this page is closed. The
+    // web no longer polls, which would double-execute against the same seq.
     stopEventPolling();
-    eventPollTimer = window.setInterval(() => {
-      void pollHelperEvents();
-    }, EVENT_POLL_INTERVAL_MS);
+    void pollHelperEvents; // kept for reference; the 中枢 owns the drain loop now
   }
 
   function stopEventPolling(): void {

@@ -14,6 +14,7 @@ import { Foreground } from './foreground.mjs';
 import { ContextEngine } from './engine.mjs';
 import { DEFAULT_RULES } from './rules.mjs';
 import { Media } from './media.mjs';
+import { Slots } from './slots.mjs';
 
 const HOST = '127.0.0.1';
 const PORT = 8755;
@@ -131,6 +132,10 @@ media.on('change', (info) => {
   console.log(`[media] ${info.status}: ${info.title}${info.artist ? ' - ' + info.artist : ''}`);
 });
 
+/* Drain function-slot triggers from the keyboard board and run their helper
+ * actions in-process, so they fire even with no web page open. */
+const slots = new Slots({ keyboardBoard, executeEvents });
+
 const server = http.createServer(async (req, res) => {
   try {
     if (handleCors(req, res)) {
@@ -218,6 +223,7 @@ server.listen(PORT, HOST, () => {
   foreground.start();
   engine.start();
   media.start();
+  slots.start();
 });
 
 let restartScheduled = false;

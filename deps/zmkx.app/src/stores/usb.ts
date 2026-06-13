@@ -1,14 +1,10 @@
 import { onMounted, ref, toRef, watch } from 'vue';
 import { defineStore } from 'pinia';
 
-import type {
-  IUsbCommDevice,
-  IUsbCommTransport,
-  UsbTransportTrace,
-} from '@/utils/usb/usb';
-import { UsbCommHidTransport } from '@/utils/usb/usb-hid';
+import type { IUsbCommDevice, UsbTransportTrace } from '@/utils/usb/usb';
 
 import { UsbComm } from '@/proto/comm.proto';
+import { useHelperCore } from './helperCore';
 import { useVersionStore } from './version';
 import { useKnobStore } from './knob';
 import { useRgbStore } from './rgb';
@@ -21,14 +17,27 @@ export enum TransportType {
   USB_HID,
 }
 
+/*
+ * Pure-frontend transport. The web app no longer opens WebHID itself; every
+ * request now goes through the 中枢 (helper-core) over WebSocket, which owns the
+ * HID session to BOTH boards and routes by action. This store keeps the original
+ * useUsbComm API so the existing stores/routes are untouched — only the
+ * transport beneath it moved from WebHID to the 中枢.
+ */
+
+// The 中枢 owns the real device; routes only read `device` as a truthy
+// "connected" flag, so a sentinel object is sufficient.
+const CONNECTED_DEVICE = {} as unknown as IUsbCommDevice;
+
 export const useUsbComm = defineStore('usb', () => {
-  const MAX_TRACE_ENTRIES = 40;
-  const RESPONSE_TIMEOUT_MS = 1500;
+  const core = useHelperCore();
 
   const device = ref<IUsbCommDevice>();
   const devices = ref<IUsbCommDevice[]>([]);
   const messageListeners = new Set<(res: UsbComm.MessageD2H) => void>();
   const disconnectListeners = new Set<() => void>();
+  // Kept for the Debug page binding; per-packet tracing lived in the WebHID
+  // transport and is not surfaced over the 中枢 link.
   const transportTrace = ref<UsbTransportTrace[]>([]);
   const transportStats = ref({
     txMessages: 0,
@@ -45,18 +54,6 @@ export const useUsbComm = defineStore('usb', () => {
   const einkStore = useEinkStore();
   const touchbarStore = useTouchbarStore();
   const functionSlotStore = useFunctionSlotStore();
-  let requestQueue = Promise.resolve();
-  let activePendingRequest: PendingRequest | undefined;
-
-  const comm: IUsbCommTransport<IUsbCommDevice> = new UsbCommHidTransport(
-    handleList,
-    handleTransferIn,
-    handleDisconnected,
-    handleTransportTrace);
-
-  function handleList(devs: IUsbCommDevice[]): void {
-    devices.value = devs;
-  }
 
   function handleTransferIn(res: UsbComm.MessageD2H): void {
     if (res.payload == 'version' && res.version) {
@@ -84,16 +81,9 @@ export const useUsbComm = defineStore('usb', () => {
     functionSlotStore.$patchTransport(res);
 
     messageListeners.forEach((listener) => listener(res));
-
-    if (activePendingRequest?.action === res.action &&
-      (!activePendingRequest.matcher || activePendingRequest.matcher(res))) {
-      clearPendingRequest();
-    }
   }
 
   function handleDisconnected(): void {
-    requestQueue = Promise.resolve();
-    clearPendingRequest(new Error('USB device disconnected'));
     device.value = undefined;
     versionStore.$resetState();
     knobStore.$resetState();
@@ -104,150 +94,61 @@ export const useUsbComm = defineStore('usb', () => {
     disconnectListeners.forEach((listener) => listener());
   }
 
-  function handleTransportTrace(trace: UsbTransportTrace): void {
-    const entries = transportTrace.value.slice();
-    const lastEntry = entries[entries.length - 1];
+  // Async device -> host events (e.g. function-slot triggers) arrive over the
+  // 中枢 event channel; dispatch them through the same store-patch path.
+  core.onKeyboardEvent((res) => handleTransferIn(res));
 
-    if (lastEntry && sameTrace(lastEntry, trace)) {
-      entries[entries.length - 1] = {
-        ...lastEntry,
-        ts: trace.ts,
-        repeatCount: (lastEntry.repeatCount ?? 1) + 1,
-      };
-      transportTrace.value = entries;
-    } else {
-      transportTrace.value = [...entries, { ...trace, repeatCount: 1 }].slice(-MAX_TRACE_ENTRIES);
-    }
+  // Reflect the 中枢 connection as the device connection.
+  watch(
+    () => core.connected,
+    (connected) => {
+      if (connected) {
+        device.value = CONNECTED_DEVICE;
+      } else if (device.value) {
+        handleDisconnected();
+      }
+    },
+    { immediate: true },
+  );
 
-    if (trace.kind === 'tx-message') {
-      transportStats.value.txMessages++;
-      return;
+  async function pick(_device?: IUsbCommDevice): Promise<void> {
+    void _device; // the 中枢 owns device selection; nothing to pick on the web
+    if (!core.connected) {
+      throw new Error('中枢未连接');
     }
-    if (trace.kind === 'tx-packet') {
-      transportStats.value.txPackets++;
-      return;
-    }
-    if (trace.kind === 'rx-packet') {
-      transportStats.value.rxPackets++;
-      return;
-    }
-    if (trace.kind === 'rx-decode') {
-      transportStats.value.decodedMessages++;
-      return;
-    }
-    if (trace.kind === 'rx-drop') {
-      transportStats.value.droppedMessages++;
-      return;
-    }
-    if (trace.kind === 'rx-overflow') {
-      transportStats.value.overflowCount++;
-    }
-  }
-
-  async function pick(dev: IUsbCommDevice): Promise<void> {
-    device.value = await comm.pick(dev);
-    if (!device.value) {
-      throw new Error('Device open failed');
-    }
+    device.value = CONNECTED_DEVICE;
   }
 
   async function request(): Promise<void> {
-    device.value = await comm.request();
-    if (!device.value) {
-      throw new Error('Device not supported');
+    if (!core.connected) {
+      throw new Error('中枢未连接');
     }
+    device.value = CONNECTED_DEVICE;
   }
 
   async function close(): Promise<void> {
-    await comm.close();
+    device.value = undefined;
   }
 
-  async function send(message: UsbComm.IMessageH2D, options?: { responseMatcher?: (res: UsbComm.MessageD2H) => boolean }) {
-    const sendTask = async () => {
-      if (!device.value) {
-        throw new Error('Device not connected');
-      }
-
-      // Firmware USB comm currently exposes a single receive slot, so host requests
-      // must stay strictly request-response serialized.
-      const responsePromise = waitForResponse(message.action, options?.responseMatcher);
-      try {
-        await comm.send(message);
-        await responsePromise;
-      } catch (error) {
-        clearPendingRequest(error instanceof Error ? error : new Error(String(error)));
-        throw error;
-      }
-    };
-
-    const queuedTask = requestQueue.then(sendTask, sendTask);
-    requestQueue = queuedTask.catch(() => {});
-    await queuedTask;
+  async function send(
+    message: UsbComm.IMessageH2D,
+    options?: { responseMatcher?: (res: UsbComm.MessageD2H) => boolean },
+  ): Promise<void> {
+    void options; // the 中枢 resolves each request by id; no matcher needed
+    if (!core.connected) {
+      throw new Error('中枢未连接');
+    }
+    const res = await core.sendViaCore(message);
+    handleTransferIn(res);
   }
 
   function $resetState(): void {
-    device.value = undefined;
+    device.value = core.connected ? CONNECTED_DEVICE : undefined;
     transportTrace.value = [];
-    transportStats.value = {
-      txMessages: 0,
-      txPackets: 0,
-      rxPackets: 0,
-      decodedMessages: 0,
-      droppedMessages: 0,
-      overflowCount: 0,
-    };
   }
 
   function clearTransportTrace(): void {
     transportTrace.value = [];
-    transportStats.value = {
-      txMessages: 0,
-      txPackets: 0,
-      rxPackets: 0,
-      decodedMessages: 0,
-      droppedMessages: 0,
-      overflowCount: 0,
-    };
-  }
-
-  function clearPendingRequest(error?: Error): void {
-    const pending = activePendingRequest;
-    activePendingRequest = undefined;
-    if (!pending) {
-      return;
-    }
-
-    window.clearTimeout(pending.timer);
-    if (error) {
-      pending.reject(error);
-      return;
-    }
-    pending.resolve();
-  }
-
-  function waitForResponse(action: UsbComm.Action, matcher?: (res: UsbComm.MessageD2H) => boolean): Promise<void> {
-    if (activePendingRequest) {
-      return Promise.reject(new Error(`USB transport busy waiting for ${pendingActionLabel(activePendingRequest.action)}`));
-    }
-
-    return new Promise<void>((resolve, reject) => {
-      const timer = window.setTimeout(() => {
-        if (!activePendingRequest || activePendingRequest.action !== action) {
-          return;
-        }
-
-        activePendingRequest = undefined;
-        reject(new Error(`${pendingActionLabel(action)} response timed out`));
-      }, RESPONSE_TIMEOUT_MS);
-
-      activePendingRequest = {
-        action,
-        matcher,
-        resolve,
-        reject,
-        timer,
-      };
-    });
   }
 
   function addMessageListener(listener: (res: UsbComm.MessageD2H) => void): () => void {
@@ -276,14 +177,6 @@ export const useUsbComm = defineStore('usb', () => {
   };
 });
 
-type PendingRequest = {
-  action: UsbComm.Action;
-  matcher?: (res: UsbComm.MessageD2H) => boolean;
-  resolve: () => void;
-  reject: (error: Error) => void;
-  timer: number;
-};
-
 type IUsbCommStore = ReturnType<typeof useUsbComm>;
 
 export function onDeviceConnected(store: IUsbCommStore, callback: (device: IUsbCommDevice) => void) {
@@ -299,19 +192,4 @@ export function onDeviceConnected(store: IUsbCommStore, callback: (device: IUsbC
 
   onMounted(onConnected);
   watch(device, onConnected);
-}
-
-function sameTrace(lhs: UsbTransportTrace, rhs: UsbTransportTrace): boolean {
-  return lhs.kind === rhs.kind &&
-    lhs.summary === rhs.summary &&
-    lhs.rawHex === rhs.rawHex &&
-    lhs.action === rhs.action &&
-    lhs.payload === rhs.payload &&
-    lhs.packetLength === rhs.packetLength &&
-    lhs.messageLength === rhs.messageLength &&
-    lhs.queueLength === rhs.queueLength;
-}
-
-function pendingActionLabel(action: UsbComm.Action): string {
-  return UsbComm.Action[action] ?? `Action ${action}`;
 }
