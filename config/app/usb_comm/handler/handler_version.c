@@ -3,12 +3,16 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <string.h>
+
 #include <zephyr/devicetree.h>
 
 #include "handler.h"
 #include "usb_comm.pb.h"
 
 #include <pb_encode.h>
+
+#include <zmk/rgb_underglow.h>
 
 #ifdef VER_ZEPHYR
 static const char *zephyr_version = VER_ZEPHYR;
@@ -54,6 +58,10 @@ static bool handle_version(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *
 	res->features.has_rgb = res->features.rgb = true;
 	res->features.has_rgb_full_control = res->features.rgb_full_control = true;
 	res->features.has_rgb_indicator = res->features.rgb_indicator = true;
+	res->features.has_rgb_effect_count = true;
+	res->features.rgb_effect_count = zmk_rgb_underglow_effect_count();
+	res->features.has_rgb_effect_mask = true;
+	res->features.rgb_effect_mask = zmk_rgb_underglow_effects_mask();
 #endif // CONFIG_HW75_USB_COMM_FEATURE_RGB
 
 #ifdef CONFIG_HW75_USB_COMM_FEATURE_EINK
@@ -70,6 +78,25 @@ static bool handle_version(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *
 #endif // DT_HAS_COMPAT_STATUS_OKAY(zmk_knob_profile_switch)
 
 	res->features.has_knob_spring_report = res->features.knob_spring_report = true;
+	res->features.has_debug_log = true;
+	res->features.debug_log = true;
+
+#ifdef CONFIG_HW75_TOUCHBAR
+	res->features.has_touchbar = res->features.touchbar = true;
+	res->features.has_touchbar_config = res->features.touchbar_config = true;
+#endif
+
+#ifdef CONFIG_HW75_FUNCTION_SLOT
+	res->features.has_function_slots = res->features.function_slots = true;
+#endif
+
+#ifdef CONFIG_HW75_EINK_MODES
+	res->features.has_eink_modes = res->features.eink_modes = true;
+#endif
+
+#ifdef CONFIG_HW75_KNOB_CALIBRATION_PERSIST
+	res->features.has_knob_calibration = res->features.knob_calibration = true;
+#endif
 
 	return true;
 }

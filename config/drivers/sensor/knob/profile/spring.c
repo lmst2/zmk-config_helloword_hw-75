@@ -22,9 +22,7 @@ struct knob_spring_config {
 };
 
 struct knob_spring_data {
-	float center;
-	float up;
-	float down;
+	float dead_zone;
 	int32_t value;
 	int32_t last_report;
 };
@@ -44,9 +42,7 @@ static int knob_spring_enable(const struct device *dev)
 	motor_set_angle_pid(cfg->motor, KNOB_PROFILE_ANGLE_PID);
 #endif /* KNOB_PROFILE_HAS_ANGLE_PID */
 
-	data->center = deg_to_rad(180);
-	data->up = data->center - deg_to_rad(cfg->minimal_movement_deg);
-	data->down = data->center + deg_to_rad(cfg->minimal_movement_deg);
+	data->dead_zone = deg_to_rad(cfg->minimal_movement_deg);
 
 	return 0;
 }
@@ -65,17 +61,22 @@ static int knob_spring_tick(const struct device *dev, struct motor_control *mc)
 	struct knob_spring_data *data = dev->data;
 	ARG_UNUSED(mc);
 
+	/* The resting centre is user-tunable: whatever knob_set_position_offset
+	 * reports is where the motor will spring back to. Triggering zones are
+	 * +/- dead_zone around that centre.
+	 */
+	float centre = knob_get_position_offset(cfg->knob);
 	float p = knob_get_position(cfg->knob);
-	if (p < data->up) {
+	if (p < centre - data->dead_zone) {
 		data->value = 1;
-	} else if (p > data->down) {
+	} else if (p > centre + data->dead_zone) {
 		data->value = -1;
 	} else {
 		data->value = 0;
 	}
 
 	mc->mode = ANGLE;
-	mc->target = data->center;
+	mc->target = centre;
 
 	return 0;
 }

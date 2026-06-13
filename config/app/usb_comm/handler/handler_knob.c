@@ -201,3 +201,68 @@ static bool handle_knob_update_pref(const usb_comm_MessageH2D *h2d, usb_comm_Mes
 
 USB_COMM_HANDLER_DEFINE(usb_comm_Action_KNOB_UPDATE_PREF, usb_comm_MessageD2H_knob_pref_tag,
 			handle_knob_update_pref);
+
+static bool fill_calibration_response(usb_comm_KnobCalibration *res)
+{
+	if (!knob || !motor) {
+		return false;
+	}
+
+	/*
+	 * KnobCalibration.zero_offset is the user-level knob position offset
+	 * (radians) that spring / damped profiles use as their resting centre.
+	 * KnobCalibration.direction surfaces the FOC rotation direction detected
+	 * by auto-cal for diagnostics, but the UI does not control it anymore.
+	 */
+	float user_offset = knob_get_position_offset(knob);
+	enum motor_direction dir = UNKNOWN;
+	float foc_offset = 0.0f;
+	motor_calibrate_get(motor, &foc_offset, &dir);
+
+	res->has_zero_offset = true;
+	res->zero_offset = user_offset;
+	res->has_direction = true;
+	res->direction = (int32_t)dir;
+	res->has_calibrated = true;
+	res->calibrated = motor_is_calibrated(motor);
+	res->has_reset_auto = false;
+	return true;
+}
+
+static bool handle_knob_get_calibration(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *d2h,
+					const void *bytes, uint32_t bytes_len)
+{
+	ARG_UNUSED(h2d);
+	ARG_UNUSED(bytes);
+	ARG_UNUSED(bytes_len);
+
+	usb_comm_KnobCalibration *res = &d2h->payload.knob_calibration;
+	return fill_calibration_response(res);
+}
+
+USB_COMM_HANDLER_DEFINE(usb_comm_Action_KNOB_GET_CALIBRATION,
+			usb_comm_MessageD2H_knob_calibration_tag, handle_knob_get_calibration);
+
+static bool handle_knob_set_calibration(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *d2h,
+					const void *bytes, uint32_t bytes_len)
+{
+	ARG_UNUSED(bytes);
+	ARG_UNUSED(bytes_len);
+
+	const usb_comm_KnobCalibration *req = &h2d->payload.knob_calibration;
+
+	if (req->has_reset_auto && req->reset_auto) {
+		knob_app_recalibrate_auto();
+	} else if (req->has_zero_offset) {
+		/* Only the user-level knob position offset is mutable. We ignore
+		 * has_direction because the FOC direction is owned by auto-cal.
+		 */
+		knob_app_set_calibration(req->zero_offset, 0);
+	}
+
+	usb_comm_KnobCalibration *res = &d2h->payload.knob_calibration;
+	return fill_calibration_response(res);
+}
+
+USB_COMM_HANDLER_DEFINE(usb_comm_Action_KNOB_SET_CALIBRATION,
+			usb_comm_MessageD2H_knob_calibration_tag, handle_knob_set_calibration);

@@ -1,6 +1,16 @@
 .vscode
 .west
+.local-tools
+.downloads
 /build
 /modules
 /zephyr
 /zmk
+
+# Local scratch / tooling (never commit)
+.tmp/
+.tmp-py/
+.venv-win/
+
+# Dependency installs (vendored apps rebuild these; deps/zmkx.app also has its own)
+node_modules/

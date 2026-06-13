@@ -6,9 +6,17 @@ zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 zephyr_library_sources_ifdef(CONFIG_SETTINGS storage_init.c)
 zephyr_library_sources_ifdef(CONFIG_HW75_HID_MOUSE hid_mouse.c)
 zephyr_library_sources_ifdef(CONFIG_HW75_INDICATOR indicator.c)
+zephyr_library_sources_ifdef(CONFIG_HW75_RGB_EFFECTS rgb_effects.c)
+zephyr_library_sources_ifdef(CONFIG_HW75_DIAG_LOG diag_log.c)
+zephyr_library_sources_ifdef(CONFIG_HW75_TOUCHBAR touchbar.c)
+zephyr_library_sources_ifdef(CONFIG_HW75_FUNCTION_SLOT function_slot.c)
 
 zephyr_library_sources_ifdef(CONFIG_LVGL behaviors/behavior_lvgl_key_press.c)
 zephyr_library_sources(behaviors/behavior_mouse_wheel.c)
+zephyr_library_sources_ifdef(CONFIG_HW75_TOUCHBAR behaviors/behavior_touchbar_mode.c)
+zephyr_library_sources_ifdef(CONFIG_HW75_FUNCTION_SLOT behaviors/behavior_function_slot.c)
+zephyr_library_sources_ifdef(CONFIG_HW75_EINK_MODES behaviors/behavior_eink_mode_cycle.c)
+zephyr_library_include_directories_ifdef(CONFIG_HW75_EINK_MODES ${BOARD_DIR}/app)
 
 add_subdirectory_ifdef(CONFIG_HW75_USB_COMM usb_comm)
 

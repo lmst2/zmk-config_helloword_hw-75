@@ -85,6 +85,7 @@
 │   │   │
 │   │   ├── behaviors/               DTS 绑定 behavior 实现
 │   │   │   ├── behavior_touchbar_mode.c      &tb_mode
+│   │   │   ├── behavior_eink_mode_cycle.c    &ekcyc（dynamic 墨水屏模式循环，CONFIG_HW75_EINK_MODES）
 │   │   │   ├── behavior_function_slot.c      &fn_slot <idx>
 │   │   │   ├── behavior_mouse_wheel.c        &mwh（鼠标滚轮）
 │   │   │   └── behavior_lvgl_key_press.c     &lvkp（dynamic 屏幕用）
@@ -371,6 +372,8 @@ Rgb.vue:toggle
 ## 6. 内存与资源约束（**当前非常紧**）
 
 最近一次完整编译（2026-04，含 eink-modes / knob-calibration / uart_slip timeout / per-board options 瘦身）实测水位：
+
+> ⚠️ **下表是手抄快照，不会自动更新**，可能已与 HEAD 漂移（实测过预编译 elf 的 SRAM 余量约 176 B 而非 296 B）。**永远以一次新构建为准**：`west build` 结尾的 Zephyr `Memory region … %age Used` 报告给出 SRAM/FLASH；`arm-zephyr-eabi-nm --size-sort build/<board>/zephyr/zmk.elf | findstr usb_.2._msg` 给出 oneof union 大小。CI 现已对 keyboard 加 SRAM 水位闸（`.github/workflows/build.yml`，超 20384 B 失败）。本仓库其它复述这些数字的地方（CLAUDE.md rule 3、§3、§8）都视为"约值，权威看本表 / 重编确认"。
 
 | 资源 | keyboard@1.2 | dynamic@B | 说明 |
 | --- | --- | --- | --- |

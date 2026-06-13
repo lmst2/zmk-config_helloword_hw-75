@@ -1,0 +1,10 @@
+# Normalize line endings: let Git's heuristic decide text vs binary, store text as LF.
+# (Restores the file deleted by b56ff48; do NOT add a global `eol=lf` — it would
+#  override binary detection on the assets below.)
+* text=auto
+*.sh text eol=lf
+
+# Tracked binary assets — keep explicit so they are never line-ending normalized.
+*.ttf binary
+*.png binary
+*.jpg binary

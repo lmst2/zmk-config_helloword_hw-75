@@ -1,0 +1,14 @@
+/*
+ * Copyright (c) 2026
+ * SPDX-License-Identifier: MIT
+ */
+
+/ {
+	behaviors {
+		/omit-if-no-ref/ fn_slot: behavior_function_slot {
+			compatible = "zmk,behavior-function-slot";
+			label = "FUNCTION_SLOT";
+			#binding-cells = <1>;
+		};
+	};
+};

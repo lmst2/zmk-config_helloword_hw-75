@@ -329,5 +329,16 @@
 			label = "code_partition";
 			reg = <0x00010000 DT_SIZE_K(320)>;
 		};
+
+		/*
+		 * E-Ink frame storage for slideshow / static images. Uses two
+		 * 128K sectors (7 and 8) so Zephyr NVS can wear-level across
+		 * them. Each frame is ~4.7 KB (128x296 @ 1bpp); we keep up to
+		 * 8 frames plus a mode configuration blob.
+		 */
+		eink_frames_partition: partition@60000 {
+			label = "eink_frames";
+			reg = <0x00060000 DT_SIZE_K(256)>;
+		};
 	};
 };

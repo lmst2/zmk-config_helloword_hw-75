@@ -6,9 +6,10 @@
 #include "handler.h"
 #include "usb_comm.pb.h"
 
+#include <zephyr/sys/util.h>
+
 #include <zmk/rgb_underglow.h>
 #include <app/indicator.h>
-
 static bool handle_rgb_get_state(const usb_comm_MessageH2D *h2d, usb_comm_MessageD2H *d2h,
 				 const void *bytes, uint32_t bytes_len);
 
@@ -79,6 +80,12 @@ static bool handle_rgb_get_state(const usb_comm_MessageH2D *h2d, usb_comm_Messag
 
 	res->effect = zmk_rgb_underglow_calc_effect(0);
 	res->has_effect = true;
+	res->speed = zmk_rgb_underglow_get_speed();
+	res->has_speed = true;
+	res->effect_count = zmk_rgb_underglow_effect_count();
+	res->has_effect_count = true;
+	res->effect_mask = zmk_rgb_underglow_effects_mask();
+	res->has_effect_mask = true;
 
 	return true;
 }
@@ -107,6 +114,9 @@ static bool handle_rgb_set_state(const usb_comm_MessageH2D *h2d, usb_comm_Messag
 
 	if (req->has_effect) {
 		zmk_rgb_underglow_select_effect((int)req->effect);
+	}
+	if (req->has_speed) {
+		zmk_rgb_underglow_set_speed(req->speed);
 	}
 
 	return handle_rgb_get_state(h2d, d2h, bytes, bytes_len);

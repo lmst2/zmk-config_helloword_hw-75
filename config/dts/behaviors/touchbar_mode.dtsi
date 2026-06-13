@@ -1,0 +1,14 @@
+/*
+ * Copyright (c) 2026
+ * SPDX-License-Identifier: MIT
+ */
+
+/ {
+	behaviors {
+		/omit-if-no-ref/ tb_mode: behavior_touchbar_mode {
+			compatible = "zmk,behavior-touchbar-mode";
+			label = "TOUCHBAR_MODE";
+			#binding-cells = <0>;
+		};
+	};
+};

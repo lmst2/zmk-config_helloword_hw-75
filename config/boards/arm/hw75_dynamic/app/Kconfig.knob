@@ -6,3 +6,12 @@ DT_ALIAS_KNOB := knob
 config HW75_KNOB
 	bool
 	default $(dt_alias_enabled,$(DT_ALIAS_KNOB))
+
+config HW75_KNOB_CALIBRATION_PERSIST
+	bool "Persist manual knob zero offset calibration"
+	default y if HW75_KNOB
+	depends on HW75_KNOB && SETTINGS
+	help
+	  Store the user-adjusted motor zero offset and direction via
+	  Zephyr settings (subtree "app/knob/calibration") and re-apply
+	  them after the boot-time auto calibration.

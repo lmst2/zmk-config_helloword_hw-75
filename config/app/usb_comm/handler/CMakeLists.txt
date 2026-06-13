@@ -25,3 +25,17 @@ zephyr_library_include_directories_ifdef(CONFIG_HW75_USB_COMM_FEATURE_RGB ${APPL
 # handler - eink
 
 zephyr_library_sources_ifdef(CONFIG_HW75_USB_COMM_FEATURE_EINK handler_eink.c)
+zephyr_library_sources_ifdef(CONFIG_HW75_EINK_MODES handler_eink_mode.c)
+zephyr_library_include_directories_ifdef(CONFIG_HW75_EINK_MODES ${BOARD_DIR}/app)
+
+# handler - debug log
+
+zephyr_library_sources_ifdef(CONFIG_HW75_USB_COMM_FEATURE_DEBUG_LOG handler_debug_log.c)
+
+# handler - touchbar
+
+zephyr_library_sources_ifdef(CONFIG_HW75_TOUCHBAR handler_touchbar.c)
+
+# handler - function slots
+
+zephyr_library_sources_ifdef(CONFIG_HW75_FUNCTION_SLOT handler_function_slot.c)

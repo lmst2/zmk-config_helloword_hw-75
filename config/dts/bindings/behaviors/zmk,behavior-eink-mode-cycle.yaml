@@ -1,0 +1,8 @@
+# Copyright (c) 2026
+# SPDX-License-Identifier: MIT
+
+description: Cycle the active E-Ink mode by a signed delta (+1/-1)
+
+compatible: "zmk,behavior-eink-mode-cycle"
+
+include: one_param.yaml

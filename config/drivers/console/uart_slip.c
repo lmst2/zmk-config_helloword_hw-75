@@ -38,34 +38,82 @@ struct uart_slip_config {
 	const struct device *uart;
 };
 
+/*
+ * Total wall-clock budget for sending one SLIP frame. At 115200 bps each byte
+ * takes ~87us; a worst-case 64-byte frame with full escaping would take
+ * ~11ms to send normally, so 20ms leaves a generous margin while still
+ * failing fast when the peer has pinned the TX line (e.g. dynamic sitting in
+ * its UF2 bootloader). Without this we would busy-loop inside
+ * uart_poll_out()'s "while (!TXE) {}" forever and deadlock whatever work /
+ * thread called us.
+ */
+#define UART_SLIP_SEND_BUDGET_MS 20
+
+static int send_byte(const struct device *uart, uint8_t b, int64_t deadline_ms)
+{
+	while (true) {
+		/*
+		 * uart_fifo_fill() is non-blocking: it returns 0 when TX is
+		 * not ready (TXE=0 on STM32 without FIFO) and 1 once it has
+		 * written the byte, all without busy-waiting inside the
+		 * driver. We do the waiting ourselves with a deadline so a
+		 * stuck line can never hold the caller hostage.
+		 */
+		int sent = uart_fifo_fill(uart, &b, 1);
+		if (sent == 1) {
+			return 0;
+		}
+
+		if (k_uptime_get() >= deadline_ms) {
+			return -ETIMEDOUT;
+		}
+
+		k_yield();
+	}
+}
+
 int uart_slip_send(const struct device *dev, const uint8_t *buf, uint32_t len)
 {
 	const struct uart_slip_config *config = dev->config;
 
-	uint8_t b;
-
 	LOG_HEXDUMP_DBG(buf, len, "TX");
 
-	uart_poll_out(config->uart, SLIP_END);
+	int64_t deadline = k_uptime_get() + UART_SLIP_SEND_BUDGET_MS;
+
+	if (send_byte(config->uart, SLIP_END, deadline) != 0) {
+		return -ETIMEDOUT;
+	}
+
 	while (len--) {
-		b = *buf++;
+		uint8_t b = *buf++;
+		int ret;
+
 		switch (b) {
 		case SLIP_END:
-			uart_poll_out(config->uart, SLIP_ESC);
-			uart_poll_out(config->uart, SLIP_ESC_END);
+			ret = send_byte(config->uart, SLIP_ESC, deadline);
+			if (ret != 0) {
+				return ret;
+			}
+			ret = send_byte(config->uart, SLIP_ESC_END, deadline);
 			break;
 		case SLIP_ESC:
-			uart_poll_out(config->uart, SLIP_ESC);
-			uart_poll_out(config->uart, SLIP_ESC_ESC);
+			ret = send_byte(config->uart, SLIP_ESC, deadline);
+			if (ret != 0) {
+				return ret;
+			}
+			ret = send_byte(config->uart, SLIP_ESC_ESC, deadline);
 			break;
 		default:
-			uart_poll_out(config->uart, b);
+			ret = send_byte(config->uart, b, deadline);
 			break;
 		}
-	}
-	uart_poll_out(config->uart, SLIP_END);
 
-	return 0;
+		if (ret != 0) {
+			return ret;
+		}
+	}
+
+	return send_byte(config->uart, SLIP_END, deadline);
 }
 
 int uart_slip_receive(const struct device *dev, uint8_t *buf, uint32_t limit, uint32_t *len)

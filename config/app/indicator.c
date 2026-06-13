@@ -17,6 +17,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/events/activity_state_changed.h>
 
 #include <app/indicator.h>
+#include <app/diag_log.h>
 
 #define STRIP_CHOSEN          DT_CHOSEN(zmk_underglow)
 #define STRIP_INDICATOR_LABEL "STATUS"
@@ -41,6 +42,14 @@ static struct led_rgb current;
 static bool active = true;
 
 static uint32_t state = 0;
+
+static void indicator_update_snapshot_state(void) {
+	hw75_diag_update_snapshot(
+		HW75_DIAG_MODULE_INDICATOR,
+		hw75_diag_pack_u8x4(settings.enable ? 1U : 0U, settings.brightness_active,
+				    settings.brightness_inactive, active ? 1U : 0U),
+		state, 0U);
+}
 
 static inline struct led_rgb apply_brightness(struct led_rgb color, uint8_t bri)
 {
@@ -166,6 +175,17 @@ static void indicator_preview_brightness(uint8_t brightness)
 	k_work_reschedule(&indicator_clear_preview_work, K_MSEC(2000));
 }
 
+void indicator_preview_rgb(uint8_t red, uint8_t green, uint8_t blue, uint32_t duration_ms)
+{
+	struct led_rgb color = RGB(red, green, blue);
+
+	unsigned int key = irq_lock();
+	led_strip_remap_set(led_strip, STRIP_INDICATOR_LABEL, &color);
+	irq_unlock(key);
+
+	k_work_reschedule(&indicator_clear_preview_work, K_MSEC(MAX(duration_ms, 1U)));
+}
+
 void indicator_set_enable(bool enable)
 {
 	settings.enable = enable;
@@ -175,6 +195,12 @@ void indicator_set_enable(bool enable)
 	}
 	indicator_save_settings();
 	post_indicator_update();
+	hw75_diag_log_event(HW75_DIAG_LEVEL_INFO, HW75_DIAG_MODULE_INDICATOR, 0U,
+			    HW75_DIAG_EVENT_INDICATOR_ENABLE,
+			    hw75_diag_pack_u8x4(enable ? 1U : 0U, settings.brightness_active,
+						settings.brightness_inactive, 0U),
+			    false, 0U);
+	indicator_update_snapshot_state();
 }
 
 void indicator_set_brightness_active(uint8_t brightness)
@@ -182,6 +208,12 @@ void indicator_set_brightness_active(uint8_t brightness)
 	settings.brightness_active = brightness;
 	indicator_save_settings();
 	indicator_preview_brightness(brightness);
+	hw75_diag_log_event(HW75_DIAG_LEVEL_INFO, HW75_DIAG_MODULE_INDICATOR, 0U,
+			    HW75_DIAG_EVENT_INDICATOR_BRIGHTNESS_ACTIVE,
+			    hw75_diag_pack_u8x4(brightness, settings.brightness_inactive,
+						settings.enable ? 1U : 0U, 0U),
+			    false, 0U);
+	indicator_update_snapshot_state();
 }
 
 void indicator_set_brightness_inactive(uint8_t brightness)
@@ -189,6 +221,12 @@ void indicator_set_brightness_inactive(uint8_t brightness)
 	settings.brightness_inactive = brightness;
 	indicator_save_settings();
 	indicator_preview_brightness(brightness);
+	hw75_diag_log_event(HW75_DIAG_LEVEL_INFO, HW75_DIAG_MODULE_INDICATOR, 0U,
+			    HW75_DIAG_EVENT_INDICATOR_BRIGHTNESS_INACTIVE,
+			    hw75_diag_pack_u8x4(settings.brightness_active, brightness,
+						settings.enable ? 1U : 0U, 0U),
+			    false, 0U);
+	indicator_update_snapshot_state();
 }
 
 const struct indicator_settings *indicator_get_settings(void)
@@ -230,6 +268,12 @@ static int indicator_init(const struct device *dev)
 
 	k_mutex_init(&lock);
 	k_work_submit_to_queue(zmk_workqueue_lowprio_work_q(), &indicator_update_work);
+	hw75_diag_log_event(HW75_DIAG_LEVEL_INFO, HW75_DIAG_MODULE_INDICATOR, 0U,
+			    HW75_DIAG_EVENT_INDICATOR_INIT,
+			    hw75_diag_pack_u8x4(settings.enable ? 1U : 0U, settings.brightness_active,
+						settings.brightness_inactive, active ? 1U : 0U),
+			    false, 0U);
+	indicator_update_snapshot_state();
 
 	return 0;
 }

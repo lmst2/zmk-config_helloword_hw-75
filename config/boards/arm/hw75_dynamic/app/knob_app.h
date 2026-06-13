@@ -24,3 +24,6 @@ int knob_app_get_prefs(const struct knob_pref **prefs, const char ***names);
 const struct knob_pref *knob_app_get_pref(uint8_t layer_id);
 void knob_app_set_pref(uint8_t layer_id, struct knob_pref *pref);
 void knob_app_reset_pref(uint8_t layer_id);
+
+int knob_app_set_calibration(float zero_offset, int direction);
+int knob_app_recalibrate_auto(void);

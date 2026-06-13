@@ -166,6 +166,16 @@ static void usb_comm_handle_message()
 	*h2d = (usb_comm_MessageH2D)usb_comm_MessageH2D_init_zero;
 	*d2h = (usb_comm_MessageD2H)usb_comm_MessageD2H_init_zero;
 
+#if CONFIG_HW75_USB_COMM_MAX_BYTES_FIELD_SIZE
+	/*
+	 * Reset the streamed bytes length per message. read_bytes_field() only
+	 * runs when an eink_image/eink_frame actually carries its optional `bits`;
+	 * without this reset, a message that omits `bits` would reuse the previous
+	 * frame's length over stale buffer contents.
+	 */
+	bytes_field_len = 0;
+#endif
+
 	h2d->cb_payload.funcs.decode = h2d_callback;
 
 	if (!pb_decode_delimited(&h2d_stream, usb_comm_MessageH2D_fields, h2d)) {

@@ -22,6 +22,24 @@ enum Action {
 	RGB_GET_INDICATOR = 10;
 	RGB_SET_INDICATOR = 11;
 	EINK_SET_IMAGE = 7;
+	LOG_GET_STATE = 12;
+	LOG_GET_EVENTS = 13;
+	LOG_SET_CONFIG = 14;
+	LOG_CLEAR = 15;
+	TOUCHBAR_GET_CONFIG = 16;
+	TOUCHBAR_SET_CONFIG = 17;
+	FUNCTION_SLOT_GET_CONFIG = 18;
+	FUNCTION_SLOT_SET_CONFIG = 19;
+	FUNCTION_SLOT_TRIGGER_EVENT_GET = 20;
+	FUNCTION_SLOT_GET_FIRMWARE_CAPS = 21;
+	EINK_GET_CONFIG = 22;
+	EINK_SET_CONFIG = 23;
+	EINK_SET_ACTIVE = 24;
+	EINK_PUSH_FRAME = 25;
+	EINK_PUSH_CLOCK = 26;
+	EINK_PUSH_WEATHER = 27;
+	KNOB_GET_CALIBRATION = 28;
+	KNOB_SET_CALIBRATION = 29;
 }
 
 message MessageH2D
@@ -38,6 +56,17 @@ message MessageH2D
 		RgbState rgb_state = 7;
 		RgbIndicator rgb_indicator = 8;
 		EinkImage eink_image = 5;
+		LogRequest log_request = 9;
+		LogConfig log_config = 10;
+		TouchbarConfig touchbar_config = 11;
+		FunctionSlotRequest function_slot_request = 12;
+		FunctionSlotConfig function_slot_config = 13;
+		EinkModeConfig eink_mode_config = 14;
+		EinkActiveRequest eink_active = 15;
+		EinkFrame eink_frame = 16;
+		EinkClock eink_clock = 17;
+		EinkWeather eink_weather = 18;
+		KnobCalibration knob_calibration = 19;
 	}
 }
 
@@ -54,6 +83,14 @@ message MessageD2H
 		RgbState rgb_state = 6;
 		RgbIndicator rgb_indicator = 9;
 		EinkImage eink_image = 7;
+		LogState log_state = 10;
+		LogEvents log_events = 11;
+		TouchbarConfig touchbar_config = 12;
+		FunctionSlotConfig function_slot_config = 13;
+		FunctionSlotCaps function_slot_caps = 14;
+		FunctionSlotEvents function_slot_events = 15;
+		EinkModeConfig eink_mode_config = 16;
+		KnobCalibration knob_calibration = 17;
 	}
 }
 
@@ -78,7 +115,270 @@ message Version
 		optional bool knob_prefs = 4;
 		optional bool knob_profile_switch = 7;
 		optional bool knob_spring_report = 8;
+		optional uint32 rgb_effect_count = 9;
+		optional uint32 rgb_effect_mask = 10;
+		optional bool debug_log = 11;
+		optional bool touchbar = 12;
+		optional bool touchbar_config = 13;
+		optional bool function_slots = 14;
+		optional bool eink_modes = 15;
+		optional bool knob_calibration = 16;
 	}
+}
+
+enum FunctionSlotType {
+	FUNCTION_SLOT_NONE = 0;
+	FUNCTION_SLOT_HID_PRESET = 1;
+	FUNCTION_SLOT_KEY_COMBO = 2;
+	FUNCTION_SLOT_MACRO_SEQ = 3;
+	FUNCTION_SLOT_HELPER_ACTION = 4;
+}
+
+message FunctionSlotRequest
+{
+	optional uint32 slot_index = 1;
+	optional uint32 after_seq = 2;
+	optional uint32 max_count = 3;
+}
+
+message FunctionSlotConfig
+{
+	optional uint32 slot_index = 1;
+	optional FunctionSlotType slot_type = 2;
+	optional uint32 action_code = 3;
+	optional int32 arg0 = 4;
+	optional int32 arg1 = 5;
+	optional int32 arg2 = 6;
+	optional uint32 flags = 7;
+	repeated uint32 macro_steps_packed = 8 [(nanopb).max_count = 6];
+}
+
+message FunctionSlotCaps
+{
+	optional uint32 slot_count = 1;
+	optional uint32 max_macro_steps = 2;
+	repeated uint32 supported_hid_presets = 3 [(nanopb).max_count = 16];
+}
+
+message FunctionSlotEvent
+{
+	required uint32 seq = 1;
+	optional uint32 slot_index = 2;
+	optional uint32 action_code = 3;
+	optional int32 arg0 = 4;
+	optional int32 arg1 = 5;
+	optional int32 arg2 = 6;
+	optional uint32 flags = 7;
+}
+
+message FunctionSlotEvents
+{
+	repeated FunctionSlotEvent events = 1 [(nanopb).max_count = 4];
+	optional uint32 dropped_count = 2;
+	optional uint32 oldest_seq = 3;
+	optional uint32 newest_seq = 4;
+}
+
+enum TouchbarMode {
+	TOUCHBAR_PAN = 0;
+	TOUCHBAR_APP_SWITCH = 1;
+	TOUCHBAR_DESKTOP_SWITCH = 2;
+}
+
+message TouchbarModeIndicator
+{
+	optional uint32 color_rgb = 1;
+	optional uint32 duration_ms = 2;
+}
+
+message TouchbarPanConfig
+{
+	optional uint32 activation_ms = 1;
+	optional uint32 release_grace_ms = 2;
+	optional uint32 poll_interval_ms = 3;
+	optional uint32 interval_ms = 4;
+	optional uint32 deadzone = 5;
+	optional uint32 position_scale = 6;
+}
+
+message TouchbarAppSwitchConfig
+{
+	optional uint32 activation_ms = 1;
+	optional uint32 release_grace_ms = 2;
+	optional uint32 release_settle_ms = 3;
+	optional uint32 step_interval_ms = 4;
+	optional uint32 step_distance = 5;
+	optional uint32 edge_repeat_delay_ms = 6;
+}
+
+message TouchbarDesktopSwitchConfig
+{
+	optional uint32 activation_ms = 1;
+	optional uint32 release_grace_ms = 2;
+	optional uint32 hold_ms = 3;
+	optional uint32 step_interval_ms = 4;
+	optional uint32 step_distance = 5;
+	optional uint32 edge_repeat_delay_ms = 6;
+	optional uint32 swipe_distance = 7;
+}
+
+message TouchbarConfig
+{
+	optional TouchbarMode mode = 1;
+	optional uint32 logical_point_count = 2;
+	optional uint32 segment_count = 3;
+	optional uint32 shared_point_count = 4;
+	// Legacy two-segment fields kept for backward compatibility.
+	optional uint32 left_touch_mask = 5;
+	optional uint32 left_entry_mask = 6;
+	optional uint32 right_touch_mask = 7;
+	optional uint32 right_entry_mask = 8;
+	optional uint32 logical_map_packed0 = 9;
+	optional uint32 logical_map_packed1 = 10;
+	optional TouchbarPanConfig pan = 11;
+	optional TouchbarAppSwitchConfig app_switch = 12;
+	optional TouchbarDesktopSwitchConfig desktop_switch = 13;
+	optional bool mode_indicator_enabled = 14;
+	optional TouchbarModeIndicator pan_indicator = 15;
+	optional TouchbarModeIndicator app_indicator = 16;
+	optional TouchbarModeIndicator desktop_indicator = 17;
+	repeated uint32 segment_touch_masks = 18 [(nanopb).max_count = 6];
+	repeated uint32 segment_entry_masks = 19 [(nanopb).max_count = 6];
+}
+
+enum LogLevel {
+	ERROR = 0;
+	WARN = 1;
+	INFO = 2;
+	DEBUG = 3;
+	TRACE = 4;
+}
+
+enum LogModule {
+	SYSTEM = 0;
+	USB_COMM = 1;
+	KSCAN = 2;
+	TOUCHBAR = 3;
+	BEHAVIOR = 4;
+	HID = 5;
+	RGB = 6;
+	INDICATOR = 7;
+	SETTINGS = 8;
+	EINK = 9;
+	KNOB = 10;
+	HELPER_CORE = 11;
+}
+
+enum LogEventId {
+	LOG_EVENT_SYSTEM_INIT = 1;
+	LOG_EVENT_SYSTEM_LOG_CONFIG = 2;
+	LOG_EVENT_USB_INIT = 10;
+	LOG_EVENT_USB_REQUEST = 11;
+	LOG_EVENT_USB_RX_OVERFLOW = 12;
+	LOG_EVENT_USB_PACKET_HEADER_INVALID = 13;
+	LOG_EVENT_USB_DECODE_FAIL = 14;
+	LOG_EVENT_USB_ENCODE_FAIL = 15;
+	LOG_EVENT_USB_RESPONSE_LARGE = 16;
+	LOG_EVENT_USB_BYTES_OVERFLOW = 17;
+	LOG_EVENT_USB_BYTES_DECODE_FAIL = 18;
+	LOG_EVENT_USB_TX_WAIT_TIMEOUT = 19;
+	LOG_EVENT_USB_TX_WRITE_FAIL = 20;
+	LOG_EVENT_USB_TX_SHORT_WRITE = 21;
+	LOG_EVENT_KSCAN_TOUCH_MAP = 30;
+	LOG_EVENT_KSCAN_TOUCH_STATE = 31;
+	LOG_EVENT_BEHAVIOR_TOUCHBAR_MODE = 40;
+	LOG_EVENT_HID_INIT = 50;
+	LOG_EVENT_HID_INIT_FAIL = 51;
+	LOG_EVENT_HID_WHEEL_SEND = 52;
+	LOG_EVENT_HID_WHEEL_SEND_FAIL = 53;
+	LOG_EVENT_RGB_CONTROL = 60;
+	LOG_EVENT_RGB_SET_STATE = 61;
+	LOG_EVENT_RGB_SET_INDICATOR = 62;
+	LOG_EVENT_INDICATOR_INIT = 70;
+	LOG_EVENT_INDICATOR_ENABLE = 71;
+	LOG_EVENT_INDICATOR_BRIGHTNESS_ACTIVE = 72;
+	LOG_EVENT_INDICATOR_BRIGHTNESS_INACTIVE = 73;
+	LOG_EVENT_TOUCHBAR_INIT = 80;
+	LOG_EVENT_TOUCHBAR_INIT_FAIL = 81;
+	LOG_EVENT_TOUCHBAR_POLL_ERROR = 82;
+	LOG_EVENT_TOUCHBAR_POLL_RECOVERED = 83;
+	LOG_EVENT_TOUCHBAR_MODE_CYCLE = 84;
+	LOG_EVENT_TOUCHBAR_TOUCH_START = 85;
+	LOG_EVENT_TOUCHBAR_ACTIVATION_WAIT = 86;
+	LOG_EVENT_TOUCHBAR_GESTURE_ACTIVE = 87;
+	LOG_EVENT_TOUCHBAR_PAN_WHEEL = 88;
+	LOG_EVENT_TOUCHBAR_APP_SWITCH_STEP = 89;
+	LOG_EVENT_TOUCHBAR_DESKTOP_SWITCH_STEP = 90;
+	LOG_EVENT_TOUCHBAR_EDGE_HOLD_ARM = 91;
+	LOG_EVENT_TOUCHBAR_DESKTOP_EDGE_ARM = 92;
+	LOG_EVENT_TOUCHBAR_APP_RELEASE_GUARD = 93;
+	LOG_EVENT_TOUCHBAR_DESKTOP_FINALIZE = 94;
+	LOG_EVENT_TOUCHBAR_DESKTOP_HOLD_WAIT = 95;
+	LOG_EVENT_TOUCHBAR_DESKTOP_SEEK = 96;
+	LOG_EVENT_TOUCHBAR_RELEASE_PENDING = 97;
+	LOG_EVENT_TOUCHBAR_RELEASE_GRACE = 98;
+	LOG_EVENT_TOUCHBAR_TOUCH_END = 99;
+	LOG_EVENT_TOUCHBAR_APP_RELEASE_JITTER = 100;
+	LOG_EVENT_USB_STACK_WATERMARK = 110;
+	LOG_EVENT_RGB_WORKQ_STACK_WATERMARK = 111;
+	LOG_EVENT_EINK_MODE_CHANGED = 120;
+	LOG_EVENT_EINK_FRAME_RECEIVED = 121;
+	LOG_EVENT_EINK_RENDER = 122;
+	LOG_EVENT_KNOB_ZERO_OFFSET_APPLIED = 130;
+	LOG_EVENT_HELPER_CLOCK_SYNC = 140;
+	LOG_EVENT_HELPER_WEATHER_SYNC = 141;
+}
+
+message LogConfig
+{
+	optional LogLevel min_level = 1;
+	optional uint32 enabled_modules_mask = 2;
+}
+
+message LogRequest
+{
+	optional uint32 after_seq = 1;
+	optional uint32 max_count = 2;
+}
+
+message LogEvent
+{
+	required uint32 seq = 1;
+	required uint32 uptime_ms = 2;
+	required LogLevel level = 3;
+	required LogModule module = 4;
+	required LogEventId event_id = 5;
+	required uint32 data0 = 6;
+	optional uint32 data1 = 7;
+	optional uint32 trace_id = 8;
+	optional uint32 repeat_count = 9;
+}
+
+message LogSnapshot
+{
+	required LogModule module = 1;
+	optional uint32 updated_ms = 2;
+	required uint32 state0 = 3;
+	required uint32 state1 = 4;
+	required uint32 state2 = 5;
+}
+
+message LogState
+{
+	optional LogConfig config = 1;
+	optional uint32 dropped_count = 2;
+	optional uint32 oldest_seq = 3;
+	optional uint32 newest_seq = 4;
+	repeated LogSnapshot snapshots = 5;
+	repeated LogEvent boot_events = 6;
+}
+
+message LogEvents
+{
+	repeated LogEvent events = 1;
+	optional uint32 dropped_count = 2;
+	optional uint32 oldest_seq = 3;
+	optional uint32 newest_seq = 4;
 }
 
 message MotorState
@@ -152,6 +452,8 @@ message RgbState
 	optional HSB color = 2;
 	optional Effect effect = 3;
 	optional uint32 speed = 4;
+	optional uint32 effect_count = 5;
+	optional uint32 effect_mask = 6;
 
 	message HSB
 	{
@@ -165,6 +467,11 @@ message RgbState
 		BREATHE = 1;
 		SPECTRUM = 2;
 		SWIRL = 3;
+		RAINBOW_SWEEP = 4;
+		REACTIVE = 5;
+		AURORA = 6;
+		RIPPLE = 7;
+		STATIC = 8;
 	}
 }
 
@@ -184,4 +491,81 @@ message EinkImage
 	optional uint32 width = 6;
 	optional uint32 height = 7;
 	optional bool partial = 8;
+}
+
+enum EinkModeType {
+	EINK_MODE_OFF = 0;
+	EINK_MODE_STATIC = 1;
+	EINK_MODE_SLIDESHOW = 2;
+	EINK_MODE_CLOCK_WEATHER = 3;
+}
+
+message EinkModeEntry
+{
+	required uint32 id = 1;
+	required EinkModeType type = 2;
+	optional string label = 3 [(nanopb).max_size = 24];
+	optional uint32 refresh_interval_s = 4;
+	optional uint32 frame_count = 5;
+}
+
+message EinkModeConfig
+{
+	// NOTE: no (nanopb).max_count here on purpose. Turning this into a
+	// callback-decoded repeated field keeps keyboard-side firmware from
+	// paying for the worst-case EinkModeEntry[] inside MessageH2D/D2H's
+	// oneof (it added ~450 B of .bss on STM32F103XB, pushing SRAM over the
+	// edge and causing runtime crashes even though the linker succeeded).
+	repeated EinkModeEntry modes = 1;
+	optional uint32 active_index = 2;
+	optional uint32 capacity = 3;
+}
+
+message EinkActiveRequest
+{
+	required uint32 active_index = 1;
+}
+
+message EinkFrame
+{
+	required uint32 mode_id = 1;
+	required uint32 frame_index = 2;
+	optional bytes bits = 3;
+}
+
+message EinkClock
+{
+	required uint32 hour = 1;
+	required uint32 minute = 2;
+	optional uint32 day = 3;
+	optional uint32 month = 4;
+	optional uint32 weekday = 5;
+	optional uint32 year = 6;
+}
+
+enum EinkWeatherIcon {
+	WEATHER_UNKNOWN = 0;
+	WEATHER_SUNNY = 1;
+	WEATHER_CLOUDY = 2;
+	WEATHER_OVERCAST = 3;
+	WEATHER_RAINY = 4;
+	WEATHER_SNOWY = 5;
+	WEATHER_STORM = 6;
+	WEATHER_FOGGY = 7;
+	WEATHER_NIGHT = 8;
+}
+
+message EinkWeather
+{
+	required sint32 temp_deci_c = 1;
+	required EinkWeatherIcon icon = 2;
+	optional string city = 3 [(nanopb).max_size = 24];
+}
+
+message KnobCalibration
+{
+	optional float zero_offset = 1;
+	optional sint32 direction = 2;
+	optional bool reset_auto = 3;
+	optional bool calibrated = 4;
 }

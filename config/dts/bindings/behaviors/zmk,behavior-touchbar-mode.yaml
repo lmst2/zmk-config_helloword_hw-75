@@ -1,0 +1,8 @@
+# Copyright (c) 2026
+# SPDX-License-Identifier: MIT
+
+description: TouchBar mode cycle behavior
+
+compatible: "zmk,behavior-touchbar-mode"
+
+include: zero_param.yaml

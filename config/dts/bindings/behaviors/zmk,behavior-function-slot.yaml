@@ -1,0 +1,4 @@
+description: Runtime function slot behavior
+compatible: "zmk,behavior-function-slot"
+
+include: one_param.yaml

@@ -1,0 +1,14 @@
+/*
+ * Copyright (c) 2026
+ * SPDX-License-Identifier: MIT
+ */
+
+/ {
+	behaviors {
+		/omit-if-no-ref/ ekcyc: behavior_eink_mode_cycle {
+			compatible = "zmk,behavior-eink-mode-cycle";
+			label = "EINK_MODE_CYCLE";
+			#binding-cells = <1>;
+		};
+	};
+};

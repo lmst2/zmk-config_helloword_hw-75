@@ -6,3 +6,16 @@ DT_ALIAS_EINK := eink
 config HW75_EINK
 	bool
 	default $(dt_alias_enabled,$(DT_ALIAS_EINK))
+
+config HW75_EINK_MODES
+	bool "Multi-mode E-Ink engine (static / slideshow / clock+weather)"
+	default y if HW75_EINK && BOARD_HW75_DYNAMIC
+	depends on HW75_EINK
+	select NVS
+	select FLASH
+	select FLASH_MAP
+	help
+	  Enable the E-Ink mode engine on hw75_dynamic. Provides a list
+	  of user-configurable modes (static image, slideshow, clock+
+	  weather, off) plus a behavior to cycle between them. Frame
+	  bitmaps are stored in the eink_frames flash partition via NVS.

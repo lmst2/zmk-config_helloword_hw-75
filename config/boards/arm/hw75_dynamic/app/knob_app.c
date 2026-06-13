@@ -20,6 +20,8 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/events/layer_state_changed.h>
 #include <app/events/knob_state_changed.h>
 
+#include <app/diag_log.h>
+
 #include "knob_app.h"
 
 #define KNOB_NODE DT_ALIAS(knob)
@@ -60,6 +62,25 @@ static struct knob_pref knob_prefs[KEYMAP_LAYERS_NUM];
 
 static struct k_work_delayable knob_enable_report_work;
 
+/*
+ * User-level "knob zero point" that shifts where profiles like spring / damped
+ * rest the knob. This is NOT the motor FOC zero_offset; that one is only ever
+ * written by motor_calibrate_auto() and must stay intact or the motor will
+ * rotate to the wrong physical angle (the original bug: spring made the white
+ * indicator line fly to the top instead of pointing up at the centre).
+ */
+struct knob_calibration_record {
+	float position_offset;
+	uint8_t valid;
+	uint8_t reserved[3];
+} __packed;
+
+#ifdef CONFIG_HW75_KNOB_CALIBRATION_PERSIST
+static struct knob_calibration_record knob_calibration = { 0 };
+static int knob_app_calibration_load_cb(const char *name, size_t len, settings_read_cb read_cb,
+					void *cb_arg, void *param);
+#endif
+
 static void knob_app_enable_report_delayed_work(struct k_work *work)
 {
 	ARG_UNUSED(work);
@@ -95,6 +116,13 @@ static void knob_app_calibrate(struct k_work *work)
 
 	int ret = motor_calibrate_auto(motor);
 	if (ret == 0) {
+#ifdef CONFIG_HW75_KNOB_CALIBRATION_PERSIST
+		if (knob_calibration.valid) {
+			knob_set_position_offset(knob, knob_calibration.position_offset);
+			LOG_INF("Restored knob position offset: %f",
+				(double)knob_calibration.position_offset);
+		}
+#endif
 		knob_app_apply_pref(zmk_keymap_highest_layer_active());
 
 		ZMK_EVENT_RAISE(new_app_knob_state_changed((struct app_knob_state_changed){
@@ -192,6 +220,12 @@ static int knob_app_settings_load_cb(const char *name, size_t len, settings_read
 		return ret;
 	}
 
+#ifdef CONFIG_HW75_KNOB_CALIBRATION_PERSIST
+	if (settings_name_steq(name, "calibration", &next) && !next) {
+		return knob_app_calibration_load_cb(name, len, read_cb, cb_arg, param);
+	}
+#endif
+
 	return -ENOENT;
 }
 
@@ -208,6 +242,80 @@ static void knob_app_save_prefs_work(struct k_work *work)
 
 static struct k_work_delayable knob_app_save_work;
 #endif
+
+#ifdef CONFIG_HW75_KNOB_CALIBRATION_PERSIST
+static int knob_app_calibration_load_cb(const char *name, size_t len, settings_read_cb read_cb,
+					void *cb_arg, void *param)
+{
+	ARG_UNUSED(name);
+	ARG_UNUSED(param);
+	int ret;
+
+	if (len != sizeof(knob_calibration)) {
+		LOG_ERR("Invalid knob calibration size: %u", (unsigned int)len);
+		return -EINVAL;
+	}
+
+	ret = read_cb(cb_arg, &knob_calibration, sizeof(knob_calibration));
+	if (ret < 0) {
+		LOG_ERR("Failed to read knob calibration: %d", ret);
+		return 0;
+	}
+
+	LOG_INF("Loaded knob calibration: position_offset=%f valid=%u",
+		(double)knob_calibration.position_offset, knob_calibration.valid);
+	return ret;
+}
+
+static int save_calibration(void)
+{
+	return settings_save_one("app/knob/calibration", &knob_calibration,
+				 sizeof(knob_calibration));
+}
+#endif
+
+int knob_app_set_calibration(float position_offset, int direction)
+{
+	ARG_UNUSED(direction);
+
+	if (!knob) {
+		return -ENODEV;
+	}
+
+	knob_set_position_offset(knob, position_offset);
+
+#ifdef CONFIG_HW75_KNOB_CALIBRATION_PERSIST
+	knob_calibration.position_offset = position_offset;
+	knob_calibration.valid = 1U;
+	int ret = save_calibration();
+	if (ret != 0) {
+		LOG_ERR("Failed to save knob calibration: %d", ret);
+	}
+#endif
+
+	hw75_diag_log_event(HW75_DIAG_LEVEL_INFO, HW75_DIAG_MODULE_KNOB,
+			    hw75_diag_next_trace_id(),
+			    HW75_DIAG_EVENT_KNOB_ZERO_OFFSET_APPLIED,
+			    (uint32_t)(position_offset * 1e6f), false, 0U);
+	return 0;
+}
+
+int knob_app_recalibrate_auto(void)
+{
+	if (!motor || !knob) {
+		return -ENODEV;
+	}
+
+#ifdef CONFIG_HW75_KNOB_CALIBRATION_PERSIST
+	knob_calibration.position_offset = 0.0f;
+	knob_calibration.valid = 0U;
+	save_calibration();
+#endif
+
+	knob_set_position_offset(knob, 0.0f);
+	k_work_submit_to_queue(&knob_work_q, &calibrate_work);
+	return 0;
+}
 
 int knob_app_save_prefs(void)
 {

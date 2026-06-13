@@ -19,7 +19,6 @@ LOG_MODULE_REGISTER(usb_comm, CONFIG_HW75_USB_COMM_LOG_LEVEL);
 
 static const struct device *hid_dev;
 static usb_comm_receive_callback_t receive_callback;
-
 static K_SEM_DEFINE(hid_sem, 1, 1);
 
 #define HID_USAGE_PAGE_VENDOR_DEFINED(page)                                                        \
@@ -99,13 +98,17 @@ int usb_comm_hid_send(uint8_t *data, uint32_t len)
 
 	tx_buf[0] = HID_COMM_REPORT_ID;
 	do {
+		ret = k_sem_take(&hid_sem, K_MSEC(30));
+		if (ret != 0) {
+			LOG_ERR("HID TX ready wait failed: %d", ret);
+			return ret;
+		}
+
 		tx_len = MIN(HID_COMM_REPORT_COUNT - 1, len);
 		tx_buf[1] = tx_len & 0xFF;
 		memcpy(tx_buf + 2, data, tx_len);
 		data += tx_len;
 		len -= tx_len;
-
-		k_sem_take(&hid_sem, K_MSEC(30));
 
 		LOG_DBG("packet size %u", sizeof(tx_buf));
 		LOG_HEXDUMP_DBG(tx_buf, sizeof(tx_buf), "packet data");
@@ -117,6 +120,7 @@ int usb_comm_hid_send(uint8_t *data, uint32_t len)
 			return ret;
 		}
 		if (written != sizeof(tx_buf)) {
+			k_sem_give(&hid_sem);
 			LOG_ERR("HID write corrupted, requested %u, sent %u", sizeof(tx_buf),
 				written);
 			return -EIO;

@@ -55,6 +55,16 @@ float knob_get_position(const struct device *dev);
 
 float knob_get_velocity(const struct device *dev);
 
+/**
+ * @brief Set the logical zero for knob position (radians).
+ *
+ * This is where profiles with a natural "centre" (e.g. spring) will rest the
+ * motor. It only shifts profile behaviour; motor FOC calibration is untouched.
+ */
+void knob_set_position_offset(const struct device *dev, float offset);
+
+float knob_get_position_offset(const struct device *dev);
+
 #ifdef __cplusplus
 }
 #endif

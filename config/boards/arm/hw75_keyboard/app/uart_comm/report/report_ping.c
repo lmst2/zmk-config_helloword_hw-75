@@ -8,7 +8,14 @@
 
 #include "report.h"
 
-#define PING_REPORT_INTERVAL_MS 5000
+/*
+ * Keep this interval large: each ping is a uart_slip_send() call on the
+ * system workqueue, and that workqueue is a cooperative thread. When the
+ * dynamic side is mid-bootloader, the per-frame 20 ms uart_slip timeout
+ * is still enough to create a visible stutter in HID / LEDs, so we only
+ * touch the wire once a minute.
+ */
+#define PING_REPORT_INTERVAL_MS 60000
 
 static void report_ping_tick(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(report_ping_work, report_ping_tick);

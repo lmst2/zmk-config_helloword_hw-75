@@ -38,6 +38,7 @@ struct knob_data {
 
 	float position_min;
 	float position_max;
+	float position_offset;
 
 	bool encoder_report;
 	int encoder_ppr;
@@ -165,6 +166,18 @@ void knob_get_position_limit(const struct device *dev, float *min, float *max)
 	struct knob_data *data = dev->data;
 	*min = data->position_min;
 	*max = data->position_max;
+}
+
+void knob_set_position_offset(const struct device *dev, float offset)
+{
+	struct knob_data *data = dev->data;
+	data->position_offset = offset;
+}
+
+float knob_get_position_offset(const struct device *dev)
+{
+	struct knob_data *data = dev->data;
+	return data->position_offset;
 }
 
 float knob_get_position(const struct device *dev)

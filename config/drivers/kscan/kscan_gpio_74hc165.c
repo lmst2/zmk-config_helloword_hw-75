@@ -14,6 +14,12 @@
 #include <zephyr/sys/util.h>
 
 #include <zmk/debounce.h>
+#include <zmk/matrix.h>
+
+#include <dt-bindings/zmk/matrix_transform.h>
+
+#include <app/kscan_74hc165.h>
+#include <app/diag_log.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -44,6 +50,11 @@ struct kscan_74hc165_data {
     /** Current state of the inputs as an array of length config->inputs.len */
     struct zmk_debounce_state *pin_state;
     uint8_t *read_buf;
+    uint8_t touchbar_state;
+    uint8_t raw_touchbar_state;
+    uint8_t debounced_touchbar_state;
+    int64_t raw_state_timestamp;
+    struct k_spinlock lock;
 };
 
 struct kscan_74hc165_config {
@@ -55,6 +66,87 @@ struct kscan_74hc165_config {
     int32_t debounce_scan_period_ms;
     int32_t poll_period_ms;
 };
+
+#if defined(CONFIG_BOARD_HW75_KEYBOARD)
+
+static const uint8_t hw75_touchbar_rows[HW75_TOUCHBAR_CHANNEL_COUNT] = {
+    10, 10, 10, 10, 10, 10,
+};
+
+static const uint8_t hw75_touchbar_cols[HW75_TOUCHBAR_CHANNEL_COUNT] = {
+    /*
+     * Verified on hardware with a temporary key-backlight overlay that mapped
+     * the six logical TouchBar channels onto the number-row LEDs 1..6.
+     * Physical touch points from left to right map to row 10 columns in this
+     * order.
+     */
+    4, 1, 3, 5, 0, 2,
+};
+
+static bool kscan_74hc165_touchbar_raw_pressed(const struct kscan_74hc165_data *data,
+                                               const struct kscan_74hc165_config *config,
+                                               uint8_t row, uint8_t col) {
+    uint8_t bits = data->read_buf[row] | ~config->scan_masks[row];
+    return (bits & BIT(col)) == 0U;
+}
+
+static uint8_t kscan_74hc165_decode_touchbar_state(const struct kscan_74hc165_data *data,
+                                                   const struct kscan_74hc165_config *config,
+                                                   bool use_debounced) {
+    uint8_t logical_touch_state = 0U;
+
+    for (int logical_pos = 0; logical_pos < HW75_TOUCHBAR_CHANNEL_COUNT; logical_pos++) {
+        uint8_t row = hw75_touchbar_rows[logical_pos];
+        uint8_t col = hw75_touchbar_cols[logical_pos];
+
+        if (row >= config->chain_length || col >= NGPIOS) {
+            continue;
+        }
+
+        bool pressed = use_debounced
+                               ? zmk_debounce_is_pressed(&data->pin_state[row * NGPIOS + col])
+                               : kscan_74hc165_touchbar_raw_pressed(data, config, row, col);
+
+        if (pressed) {
+            logical_touch_state |= BIT(HW75_TOUCHBAR_CHANNEL_COUNT - 1U - logical_pos);
+        }
+    }
+
+    return logical_touch_state;
+}
+
+void hw75_kscan_74hc165_get_touchbar_logical_map(uint8_t rows[HW75_TOUCHBAR_CHANNEL_COUNT],
+                                                 uint8_t cols[HW75_TOUCHBAR_CHANNEL_COUNT]) {
+    if (rows != NULL) {
+        memcpy(rows, hw75_touchbar_rows, sizeof(hw75_touchbar_rows));
+    }
+    if (cols != NULL) {
+        memcpy(cols, hw75_touchbar_cols, sizeof(hw75_touchbar_cols));
+    }
+}
+
+#else
+
+static uint8_t kscan_74hc165_decode_touchbar_state(const struct kscan_74hc165_data *data,
+                                                   const struct kscan_74hc165_config *config,
+                                                   bool use_debounced) {
+    ARG_UNUSED(data);
+    ARG_UNUSED(config);
+    ARG_UNUSED(use_debounced);
+    return 0U;
+}
+
+void hw75_kscan_74hc165_get_touchbar_logical_map(uint8_t rows[HW75_TOUCHBAR_CHANNEL_COUNT],
+                                                 uint8_t cols[HW75_TOUCHBAR_CHANNEL_COUNT]) {
+    if (rows != NULL) {
+        memset(rows, 0, HW75_TOUCHBAR_CHANNEL_COUNT);
+    }
+    if (cols != NULL) {
+        memset(cols, 0, HW75_TOUCHBAR_CHANNEL_COUNT);
+    }
+}
+
+#endif
 
 static void kscan_74hc165_read_continue(const struct device *dev) {
     const struct kscan_74hc165_config *config = dev->config;
@@ -116,6 +208,34 @@ static int kscan_74hc165_read(const struct device *dev) {
 
             continue_scan = continue_scan || zmk_debounce_is_active(state);
         }
+    }
+
+    uint8_t raw_touchbar_state = kscan_74hc165_decode_touchbar_state(data, config, false);
+    uint8_t debounced_touchbar_state = kscan_74hc165_decode_touchbar_state(data, config, true);
+    uint8_t previous_raw_touchbar_state = data->raw_touchbar_state;
+    uint8_t previous_debounced_touchbar_state = data->debounced_touchbar_state;
+    uint8_t previous_touchbar_state = data->touchbar_state;
+
+    k_spinlock_key_t key = k_spin_lock(&data->lock);
+    data->raw_touchbar_state = raw_touchbar_state;
+    data->debounced_touchbar_state = debounced_touchbar_state;
+    data->touchbar_state = debounced_touchbar_state;
+    data->raw_state_timestamp = k_uptime_get();
+    k_spin_unlock(&data->lock, key);
+
+    if (previous_raw_touchbar_state != raw_touchbar_state ||
+        previous_debounced_touchbar_state != debounced_touchbar_state ||
+        previous_touchbar_state != debounced_touchbar_state) {
+        hw75_diag_log_event(HW75_DIAG_LEVEL_DEBUG, HW75_DIAG_MODULE_KSCAN, 0U,
+                            HW75_DIAG_EVENT_KSCAN_TOUCH_STATE,
+                            hw75_diag_pack_u8x4(raw_touchbar_state, debounced_touchbar_state,
+                                                debounced_touchbar_state, 0U),
+                            false, 0U);
+        hw75_diag_update_snapshot(HW75_DIAG_MODULE_KSCAN,
+                                  hw75_diag_pack_u8x4(raw_touchbar_state,
+                                                      debounced_touchbar_state,
+                                                      debounced_touchbar_state, 0U),
+                                  0U, 0U);
     }
 
     if (continue_scan) {
@@ -183,6 +303,22 @@ static int kscan_74hc165_init(const struct device *dev) {
 
     k_work_init_delayable(&data->work, kscan_74hc165_work_handler);
 
+#if defined(CONFIG_BOARD_HW75_KEYBOARD)
+    hw75_diag_log_event(
+        HW75_DIAG_LEVEL_INFO, HW75_DIAG_MODULE_KSCAN, 0U, HW75_DIAG_EVENT_KSCAN_TOUCH_MAP,
+        ((uint32_t)hw75_touchbar_rows[0] & 0xFU) | (((uint32_t)hw75_touchbar_cols[0] & 0xFU) << 4) |
+            (((uint32_t)hw75_touchbar_rows[1] & 0xFU) << 8) |
+            (((uint32_t)hw75_touchbar_cols[1] & 0xFU) << 12) |
+            (((uint32_t)hw75_touchbar_rows[2] & 0xFU) << 16) |
+            (((uint32_t)hw75_touchbar_cols[2] & 0xFU) << 20) |
+            (((uint32_t)hw75_touchbar_rows[3] & 0xFU) << 24) |
+            (((uint32_t)hw75_touchbar_cols[3] & 0xFU) << 28),
+        true,
+        ((uint32_t)hw75_touchbar_rows[4] & 0xFU) | (((uint32_t)hw75_touchbar_cols[4] & 0xFU) << 4) |
+            (((uint32_t)hw75_touchbar_rows[5] & 0xFU) << 8) |
+            (((uint32_t)hw75_touchbar_cols[5] & 0xFU) << 12));
+#endif
+
     return 0;
 }
 
@@ -230,3 +366,20 @@ static const struct kscan_driver_api kscan_74hc165_api = {
                           CONFIG_APPLICATION_INIT_PRIORITY, &kscan_74hc165_api);
 
 DT_INST_FOREACH_STATUS_OKAY(KSCAN_74HC165_INIT);
+
+int hw75_kscan_74hc165_get_touchbar_state(const struct device *dev, uint8_t *state,
+                                          int64_t *timestamp) {
+    if (dev == NULL || state == NULL) {
+        return -EINVAL;
+    }
+
+    struct kscan_74hc165_data *data = dev->data;
+    k_spinlock_key_t key = k_spin_lock(&data->lock);
+    *state = data->touchbar_state;
+    if (timestamp != NULL) {
+        *timestamp = data->raw_state_timestamp;
+    }
+    k_spin_unlock(&data->lock, key);
+
+    return 0;
+}

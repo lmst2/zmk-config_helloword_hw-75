@@ -36,7 +36,7 @@ jobs:
           apt-get update
           apt-get install -y python3-pip protobuf-compiler curl
           mkdir -p "${PIP_CACHE_DIR}"
-          curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+          curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
           apt-get install -y nodejs
           # Do not upgrade pip/setuptools/wheel: Debian packages lack pip RECORD; uninstall fails.
           python3 -m pip install --break-system-packages -U fonttools
@@ -51,7 +51,6 @@ jobs:
           path: |
             modules/
             zephyr/
-            zmk/
           key: ${{ runner.os }}-build-${{ env.cache_name }}-${{ hashFiles('**/west.yml', '**/build.yaml') }}
           restore-keys: |
             ${{ runner.os }}-build-${{ env.cache_name }}-
@@ -60,21 +59,42 @@ jobs:
 
       - name: Prepare west
         run: |
-          west init -l config
+          west init -l .
           west update
           west zephyr-export
           python3 -m pip install --break-system-packages -r zephyr/scripts/requirements.txt
           # Nanopb 0.4.x protoc plugin needs protobuf Python <5 (5.x removes RegisterExtension etc.)
           python3 -m pip install --break-system-packages --force-reinstall 'protobuf==4.25.3'
+          # Fail loudly if anything pulled protobuf>=5 back in, instead of a cryptic nanopb RegisterExtension error.
+          python3 -c "import google.protobuf as p; assert int(p.__version__.split('.')[0]) < 5, f'protobuf {p.__version__} >=5 breaks the nanopb 0.4.x protoc plugin'; print('protobuf', p.__version__, 'OK')"
           git config --global --add safe.directory $PWD
 
       - name: West build
         run: |
-          west build -s zmk/app -b ${{ matrix.board }} -- \
+          set -o pipefail
+          west build -s deps/zmk/app -b ${{ matrix.board }} -- \
             -DZMK_CONFIG=${GITHUB_WORKSPACE}/config \
-            -DKEYMAP_FILE=${GITHUB_WORKSPACE}/config/${{ matrix.keymap }}
+            -DKEYMAP_FILE=${GITHUB_WORKSPACE}/config/${{ matrix.keymap }} \
+            | tee build.log
         env:
           PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+
+      - name: Check keyboard SRAM watermark
+        if: startsWith(matrix.board, 'hw75_keyboard')
+        run: |
+          ram_line=$(grep -E '^\s*RAM:' build.log | tail -1)
+          if [ -z "$ram_line" ]; then
+            echo "::error::Could not find the RAM usage line in build.log (build output format changed?)"
+            exit 1
+          fi
+          used=$(echo "$ram_line" | grep -oE '[0-9]+ B' | head -1 | grep -oE '[0-9]+')
+          # ~96 B headroom below the 20480 B STM32F103 SRAM region. Raise deliberately; see AGENTS.md §6.
+          limit=20384
+          echo "keyboard SRAM used=${used} B (gate ${limit} B, region 20480 B)"
+          if [ "$used" -gt "$limit" ]; then
+            echo "::error::keyboard SRAM ${used} B exceeds gate ${limit} B — review AGENTS.md §6 before raising the gate"
+            exit 1
+          fi
 
       - name: Rename artifacts
         run: |
@@ -93,9 +113,61 @@ jobs:
           name: firmware-${{ matrix.board }}
           path: build/artifacts
 
+  build-host:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: deps/zmkx.app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: deps/zmkx.app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Non-blocking for now: a small pre-existing strict-null backlog remains.
+      # Flip to a blocking step (drop continue-on-error) once `npm run typecheck` is clean.
+      - name: Type-check
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Build host app
+        run: npm run build
+
+      - name: Package host artifact
+        run: |
+          mkdir -p artifacts
+          tar -czf artifacts/zmkx.app-dist.tar.gz dist
+
+      - name: Archive host artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-zmkx.app
+          path: deps/zmkx.app/artifacts
+
+  check-proto-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check firmware enums vs usb_comm.proto are in sync
+        run: python3 config/proto/check_enum_sync.py
+
   release:
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
-    needs: build
+    needs:
+      - build
+      - build-host
+      - check-proto-sync
 
     runs-on: ubuntu-latest
 
@@ -107,6 +179,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: firmware-*
+          merge-multiple: true
+          path: firmware
+
+      - name: Download host artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: host-*
           merge-multiple: true
           path: firmware
 

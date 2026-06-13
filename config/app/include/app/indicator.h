@@ -21,4 +21,5 @@ uint32_t indicator_clear_bits(uint32_t bits);
 void indicator_set_enable(bool enable);
 void indicator_set_brightness_active(uint8_t brightness);
 void indicator_set_brightness_inactive(uint8_t brightness);
+void indicator_preview_rgb(uint8_t red, uint8_t green, uint8_t blue, uint32_t duration_ms);
 const struct indicator_settings *indicator_get_settings(void);

@@ -9,5 +9,6 @@ if HW75_HID_MOUSE
 
 config HW75_HID_MOUSE_DEVICE_NAME
 	string "Name of USB HID device to be used for mouse simulation"
+	default "HID_0"
 
 endif # HW75_HID_MOUSE

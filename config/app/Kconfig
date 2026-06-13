@@ -3,5 +3,39 @@
 
 rsource "usb_comm/Kconfig"
 
+config HW75_DIAG_LOG
+	bool "Enable structured diagnostic logging"
+	default y if HW75_USB_COMM
+	depends on HW75_USB_COMM
+
+if HW75_DIAG_LOG
+
+config HW75_DIAG_LOG_RING_SIZE
+	int "Diagnostic log event ring size"
+	default 8
+
+config HW75_DIAG_LOG_BOOT_EVENT_COUNT
+	int "Diagnostic boot event count"
+	default 4
+
+endif # HW75_DIAG_LOG
+
+config HW75_RGB_EFFECTS
+	bool
+	default y
+	depends on ZMK_RGB_UNDERGLOW
+
+config HW75_TOUCHBAR
+	bool
+	default y if BOARD_HW75_KEYBOARD
+	depends on BOARD_HW75_KEYBOARD
+	select HW75_HID_MOUSE
+
+config HW75_FUNCTION_SLOT
+	bool
+	default y if BOARD_HW75_KEYBOARD
+	depends on BOARD_HW75_KEYBOARD
+	select SETTINGS if HW75_USB_COMM
+
 rsource "Kconfig.hid_mouse"
 rsource "Kconfig.indicator"

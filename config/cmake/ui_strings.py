@@ -9,7 +9,9 @@ def main():
     parser.add_argument('--unicode-hex', action='store_true', required=False)
     args = parser.parse_args()
 
-    with open(args.input, 'r') as f_in, open(args.output_defs, 'w') as f_od, open(args.output_text, 'w') as f_ot:
+    with open(args.input, 'r', encoding='utf-8', newline='') as f_in, \
+         open(args.output_defs, 'w', encoding='utf-8', newline='\n') as f_od, \
+         open(args.output_text, 'w', encoding='utf-8', newline='\n') as f_ot:
         reader = csv.reader(f_in)
         for row in reader:
             key, value = row

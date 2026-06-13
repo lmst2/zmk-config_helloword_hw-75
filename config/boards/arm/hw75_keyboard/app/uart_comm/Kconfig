@@ -4,10 +4,16 @@
 DT_ALIAS_UART_COMM := uart-comm
 
 config HW75_UART_COMM
-	bool
+	bool "Send keyboard -> dynamic ping / FN state reports over UART SLIP"
 	select SERIAL
 	select HW75_PROTO_UART_COMM
 	default $(dt_alias_enabled,$(DT_ALIAS_UART_COMM))
+	help
+	  Enables periodic keepalive + FN-state reports from keyboard to
+	  dynamic via UART SLIP. uart_slip_send() has a 20ms total deadline
+	  (non-blocking uart_fifo_fill + k_yield loop) so a stalled TX line
+	  cannot hang the caller even if the dynamic is stuck in its UF2
+	  bootloader.
 
 if HW75_UART_COMM
 

@@ -1,0 +1,20 @@
+/*
+ * Copyright (c) 2026
+ * SPDX-License-Identifier: MIT
+ */
+
+#pragma once
+
+enum hw75_rgb_effect_id {
+    HW75_RGB_EFFECT_SOLID = 0,
+    HW75_RGB_EFFECT_BREATHE = 1,
+    HW75_RGB_EFFECT_SPECTRUM = 2,
+    HW75_RGB_EFFECT_SWIRL = 3,
+    HW75_RGB_EFFECT_RAINBOW_SWEEP = 4,
+    HW75_RGB_EFFECT_REACTIVE = 5,
+    HW75_RGB_EFFECT_AURORA = 6,
+    HW75_RGB_EFFECT_RIPPLE = 7,
+    HW75_RGB_EFFECT_STATIC = 8,
+};
+
+#define HW75_RGB_STOCK_EFFECT_COUNT 4
