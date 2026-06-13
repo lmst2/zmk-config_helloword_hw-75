@@ -76,6 +76,7 @@ bool uart_comm_report(uart_comm_MessageK2D *k2d)
 #include <zephyr/init.h>
 #include <pb_decode.h>
 #include <zmk/rgb_underglow.h>
+#include <app/touchbar.h>
 
 #define UART_RX_POLL_INTERVAL_MS 15
 
@@ -131,6 +132,18 @@ static void uart_comm_handle_d2k(const uart_comm_MessageD2K *d2k)
 			break;
 		default:
 			break;
+		}
+	} else if (d2k->action == uart_comm_ActionD2K_D2K_TOUCHBAR_MODE &&
+		   d2k->which_payload == uart_comm_MessageD2K_tb_mode_tag) {
+		/*
+		 * The dynamic module's knob picks the TouchBar mode; the keyboard owns
+		 * the real mode state (touchbar_set_mode). The dynamic sends 0..2
+		 * (PAN / APP_SWITCH / DESKTOP_SWITCH), skipping host-only REMOTE.
+		 * Clamp defensively — no new keyboard state, just a setter call.
+		 */
+		uint32_t mode = d2k->payload.tb_mode.mode;
+		if (mode < HW75_TOUCHBAR_MODE_COUNT) {
+			touchbar_set_mode((enum hw75_touchbar_mode)mode);
 		}
 	}
 }

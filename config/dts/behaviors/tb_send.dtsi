@@ -1,0 +1,14 @@
+/*
+ * Copyright (c) 2026
+ * SPDX-License-Identifier: MIT
+ */
+
+/ {
+	behaviors {
+		/omit-if-no-ref/ tb_send: behavior_tb_send {
+			compatible = "zmk,behavior-tb-send";
+			label = "TB_SEND";
+			#binding-cells = <1>;
+		};
+	};
+};

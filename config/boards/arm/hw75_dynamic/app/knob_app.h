@@ -31,3 +31,6 @@ int knob_app_recalibrate_auto(void);
 /* Keep the knob enabled while an external source (the keyboard, over UART)
  * reports activity, even if the dynamic module's own input has gone idle. */
 void knob_app_set_external_active(bool active);
+
+/* Brief haptic bump to confirm an on-device action (e.g. TouchBar mode change). */
+void knob_app_pulse(void);

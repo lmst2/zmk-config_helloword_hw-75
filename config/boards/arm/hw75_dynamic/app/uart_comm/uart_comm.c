@@ -61,20 +61,33 @@ static void uart_comm_handle(uint32_t len)
 
 static uint8_t uart_tx_buf[CONFIG_HW75_UART_COMM_MAX_RX_MESSAGE_SIZE];
 
+static void uart_comm_send_d2k(uart_comm_MessageD2K *d2k)
+{
+	pb_ostream_t stream = pb_ostream_from_buffer(uart_tx_buf, sizeof(uart_tx_buf));
+	if (!pb_encode_delimited(&stream, uart_comm_MessageD2K_fields, d2k)) {
+		LOG_ERR("Failed encoding d2k message: %s", stream.errmsg);
+		return;
+	}
+
+	(void)uart_slip_send(slip, uart_tx_buf, stream.bytes_written);
+}
+
 void uart_comm_send_rgb_cmd(uint32_t command)
 {
 	uart_comm_MessageD2K d2k = uart_comm_MessageD2K_init_zero;
 	d2k.action = uart_comm_ActionD2K_D2K_RGB;
 	d2k.which_payload = uart_comm_MessageD2K_rgb_tag;
 	d2k.payload.rgb.command = command;
+	uart_comm_send_d2k(&d2k);
+}
 
-	pb_ostream_t stream = pb_ostream_from_buffer(uart_tx_buf, sizeof(uart_tx_buf));
-	if (!pb_encode_delimited(&stream, uart_comm_MessageD2K_fields, &d2k)) {
-		LOG_ERR("Failed encoding d2k message: %s", stream.errmsg);
-		return;
-	}
-
-	(void)uart_slip_send(slip, uart_tx_buf, stream.bytes_written);
+void uart_comm_send_tb_mode(uint32_t mode)
+{
+	uart_comm_MessageD2K d2k = uart_comm_MessageD2K_init_zero;
+	d2k.action = uart_comm_ActionD2K_D2K_TOUCHBAR_MODE;
+	d2k.which_payload = uart_comm_MessageD2K_tb_mode_tag;
+	d2k.payload.tb_mode.mode = mode;
+	uart_comm_send_d2k(&d2k);
 }
 
 static void uart_comm_thread(void *p1, void *p2, void *p3)

@@ -8,6 +8,7 @@
 #include <behaviors/sensor_rotate_mouse_wheel.dtsi>
 #include <behaviors/eink_mode_cycle.dtsi>
 #include <behaviors/rgb_send.dtsi>
+#include <behaviors/tb_send.dtsi>
 #include <dt-bindings/zmk/keys.h>
 #include <dt-bindings/zmk/rgb.h>
 #include <dt-bindings/zmk/lvgl.h>
@@ -93,6 +94,14 @@
 			#sensor-binding-cells = <0>;
 			bindings = <&rgb_send 4>, <&rgb_send 5>;
 		};
+
+		/* Knob cycles the keyboard TouchBar mode (PAN/APP/DESKTOP) over D2K. */
+		tb_cycle: tb_cycle {
+			compatible = "zmk,behavior-sensor-rotate";
+			label = "TB_CYCLE";
+			#sensor-binding-cells = <0>;
+			bindings = <&tb_send 1>, <&tb_send (-1)>;
+		};
 	};
 
 	keymap {
@@ -172,6 +181,13 @@
 			icon = [EF 83 90];
 			bindings = <&ek_ht (-1) LV_KEY_PREV &ek_ht 1 LV_KEY_NEXT>;
 			sensor-bindings = <&rgb_rot_eff>;
+		};
+
+		touchbar {
+			label = "触摸条";
+			icon = [EF 87 9E];
+			bindings = <&ek_ht (-1) LV_KEY_PREV &ek_ht 1 LV_KEY_NEXT>;
+			sensor-bindings = <&tb_cycle>;
 		};
 	};
 };

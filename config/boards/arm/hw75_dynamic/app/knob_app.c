@@ -191,6 +191,14 @@ void knob_app_set_external_active(bool active)
 	knob_set_enable(knob, local || knob_external_active);
 }
 
+void knob_app_pulse(void)
+{
+	if (!knob || !motor || !motor_is_calibrated(motor) || motor_demo) {
+		return;
+	}
+	knob_pulse(knob, 60, 1);
+}
+
 #ifdef CONFIG_SETTINGS
 static int knob_app_settings_load_cb(const char *name, size_t len, settings_read_cb read_cb,
 				     void *cb_arg, void *param)
