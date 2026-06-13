@@ -105,6 +105,17 @@ static enum render_reason g_pending_reason;
  */
 static bool g_external_active;
 
+/*
+ * Transient centered toast (e.g. the TouchBar mode picked from the knob). We
+ * snapshot the panel, draw the toast over it with a fast partial refresh, and
+ * restore the snapshot ~0.8 s later — so it floats over the clock/weather (or
+ * now-playing card) without disturbing it. While it's up the mode loop must not
+ * redraw (it would erase the toast); the clock still advances internally.
+ */
+static struct k_work_delayable g_toast_work;
+static uint8_t g_toast_saved[EINK_FRAME_BYTES];
+static bool g_toast_active;
+
 static uint32_t frame_key(uint8_t mode_id, uint8_t frame_index)
 {
 	return EINK_NVS_KEY_FRAME_BASE + ((uint32_t)mode_id) * EINK_NVS_FRAMES_PER_MODE +
@@ -345,6 +356,12 @@ static void refresh_work_handler(struct k_work *work)
 	enum render_reason reason = g_pending_reason;
 	g_pending_reason = RENDER_REASON_IDLE;
 
+	if (g_toast_active) {
+		/* A transient toast owns the panel for its short lifetime. */
+		k_mutex_unlock(&g_lock);
+		return;
+	}
+
 	if (g_external_active) {
 		/* The host image is the active view: re-show it instead of the
 		 * configured mode (robust against any stray refresh trigger). */
@@ -454,6 +471,35 @@ int eink_mode_show_external(const uint8_t *bits, uint32_t bits_len, bool partial
 	int ret = push_frame_buf_to_eink(partial);
 	k_mutex_unlock(&g_lock);
 	return ret;
+}
+
+static void toast_work_handler(struct k_work *work)
+{
+	ARG_UNUSED(work);
+	k_mutex_lock(&g_lock, K_FOREVER);
+	if (g_toast_active) {
+		/* Restore the exact panel from before the toast and resume. */
+		memcpy(g_frame_buf, g_toast_saved, EINK_FRAME_BYTES);
+		push_frame_buf_to_eink(true);
+		g_toast_active = false;
+	}
+	k_mutex_unlock(&g_lock);
+}
+
+void eink_mode_toast_touchbar(uint8_t mode)
+{
+	k_mutex_lock(&g_lock, K_FOREVER);
+	/* Snapshot the panel once; re-toasting (quick knob spins) redraws from the
+	 * snapshot so toasts never stack on top of each other. */
+	if (!g_toast_active) {
+		memcpy(g_toast_saved, g_frame_buf, EINK_FRAME_BYTES);
+		g_toast_active = true;
+	}
+	memcpy(g_frame_buf, g_toast_saved, EINK_FRAME_BYTES);
+	eink_render_touchbar_toast(g_frame_buf, mode);
+	push_frame_buf_to_eink(true);
+	k_work_reschedule(&g_toast_work, K_MSEC(800));
+	k_mutex_unlock(&g_lock);
 }
 
 int eink_mode_set_active(uint8_t active_index)
@@ -593,8 +639,8 @@ static void clock_tick_handler(struct k_work *work)
 	const struct eink_mode_entry *mode = active_entry();
 	bool is_clock = mode && mode->type == EINK_MODE_TYPE_CLOCK_WEATHER;
 	/* Advance the time always, but only repaint when the clock is the active
-	 * view — never while a host image (now-playing card) is showing. */
-	if (is_clock && !g_external_active) {
+	 * view — never while a host image or toast is showing. */
+	if (is_clock && !g_external_active && !g_toast_active) {
 		trigger_refresh(RENDER_REASON_CLOCK, K_NO_WAIT);
 	}
 
@@ -684,6 +730,7 @@ static int eink_mode_init(const struct device *dev)
 	k_mutex_init(&g_lock);
 	k_work_init_delayable(&g_refresh_work, refresh_work_handler);
 	k_work_init_delayable(&g_clock_tick_work, clock_tick_handler);
+	k_work_init_delayable(&g_toast_work, toast_work_handler);
 
 	int ret = eink_frames_nvs_init();
 	if (ret != 0) {

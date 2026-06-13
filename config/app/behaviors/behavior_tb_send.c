@@ -18,6 +18,7 @@
  */
 extern void uart_comm_send_tb_mode(uint32_t mode);
 extern void knob_app_pulse(void);
+extern void eink_mode_toast_touchbar(uint8_t mode);
 
 #define TB_MODE_COUNT 3
 
@@ -33,6 +34,9 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
 	g_tb_mode = (g_tb_mode + delta + TB_MODE_COUNT) % TB_MODE_COUNT;
 	uart_comm_send_tb_mode((uint32_t)g_tb_mode);
 	knob_app_pulse();
+#if IS_ENABLED(CONFIG_HW75_EINK_MODES)
+	eink_mode_toast_touchbar((uint8_t)g_tb_mode); /* centered e-ink mode toast */
+#endif
 	return ZMK_BEHAVIOR_OPAQUE;
 }
 

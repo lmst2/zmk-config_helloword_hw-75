@@ -49,3 +49,7 @@ void eink_render_clear(uint8_t *buf);
 /* Render the current clock+weather state into buf. */
 void eink_render_clock_weather(uint8_t *buf, const struct eink_render_clock *clock,
 			       const struct eink_render_weather *weather);
+
+/* Draw a centered floating toast with a TouchBar-mode icon (0 PAN, 1 APP_SWITCH,
+ * 2 DESKTOP_SWITCH) over buf. The e-ink has no on-device font, so it's an icon. */
+void eink_render_touchbar_toast(uint8_t *buf, uint8_t mode);

@@ -51,6 +51,10 @@ int eink_mode_cycle(int delta);
  */
 int eink_mode_show_external(const uint8_t *bits, uint32_t bits_len, bool partial);
 
+/* Pop a centered TouchBar-mode toast for ~0.8 s, then restore the panel. Floats
+ * over the active view (clock/weather or external image) via partial refresh. */
+void eink_mode_toast_touchbar(uint8_t mode);
+
 int eink_mode_push_frame(uint8_t mode_id, uint8_t frame_index, const uint8_t *bits,
 			 uint32_t bits_len);
 int eink_mode_push_clock(uint8_t hour, uint8_t minute, uint8_t day, uint8_t month, uint8_t weekday,

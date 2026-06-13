@@ -442,3 +442,61 @@ void eink_render_clock_weather(uint8_t *buf, const struct eink_render_clock *clo
 
 	render_weather(buf, weather);
 }
+
+/* 2px black rectangle outline. */
+static void draw_rect(uint8_t *buf, int x, int y, int w, int h)
+{
+	draw_hline(buf, x, y, w, 2, COLOR_BLACK);
+	draw_hline(buf, x, y + h - 2, w, 2, COLOR_BLACK);
+	draw_vline(buf, x, y, h, 2, COLOR_BLACK);
+	draw_vline(buf, x + w - 2, y, h, 2, COLOR_BLACK);
+}
+
+/*
+ * Centered floating toast for a transient on-device notice (the TouchBar mode
+ * just picked from the knob). A white card with a black border + a mode glyph,
+ * drawn over whatever the panel was showing. The caller saves/restores the
+ * underlying frame and partial-refreshes, so it pops in and clears fast without
+ * disturbing the clock/weather (or now-playing card) behind it. The e-ink has
+ * no on-device font, so the mode is shown as an icon, not text.
+ */
+void eink_render_touchbar_toast(uint8_t *buf, uint8_t mode)
+{
+	const int BW = 84;
+	const int BH = 60;
+	const int bx = ((int)EINK_RENDER_WIDTH - BW) / 2;
+	const int by = ((int)EINK_RENDER_HEIGHT - BH) / 2;
+
+	/* White card + 3px black border so it reads as a floating label. */
+	fill_rect(buf, bx, by, BW, BH, COLOR_WHITE);
+	draw_hline(buf, bx, by, BW, 3, COLOR_BLACK);
+	draw_hline(buf, bx, by + BH - 3, BW, 3, COLOR_BLACK);
+	draw_vline(buf, bx, by, BH, 3, COLOR_BLACK);
+	draw_vline(buf, bx + BW - 3, by, BH, 3, COLOR_BLACK);
+
+	const int cx = bx + BW / 2;
+	const int cy = by + BH / 2;
+
+	switch (mode) {
+	case 0: /* PAN: horizontal double-headed arrow */
+		draw_hline(buf, cx - 18, cy - 1, 36, 2, COLOR_BLACK);
+		draw_line(buf, cx - 18, cy, cx - 10, cy - 8, COLOR_BLACK);
+		draw_line(buf, cx - 18, cy, cx - 10, cy + 8, COLOR_BLACK);
+		draw_line(buf, cx + 17, cy, cx + 9, cy - 8, COLOR_BLACK);
+		draw_line(buf, cx + 17, cy, cx + 9, cy + 8, COLOR_BLACK);
+		break;
+	case 1: /* APP_SWITCH: two overlapping windows */
+		draw_rect(buf, cx - 16, cy - 12, 22, 22);
+		fill_rect(buf, cx - 6, cy - 2, 22, 22, COLOR_WHITE);
+		draw_rect(buf, cx - 6, cy - 2, 22, 22);
+		break;
+	case 2: /* DESKTOP_SWITCH: 2x2 grid of screens */
+		draw_rect(buf, cx - 16, cy - 16, 14, 14);
+		draw_rect(buf, cx + 2, cy - 16, 14, 14);
+		draw_rect(buf, cx - 16, cy + 2, 14, 14);
+		draw_rect(buf, cx + 2, cy + 2, 14, 14);
+		break;
+	default:
+		break;
+	}
+}
