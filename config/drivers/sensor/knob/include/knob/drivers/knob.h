@@ -32,6 +32,7 @@ enum knob_mode {
 
 struct knob_params {
 	int ppr;
+	float inertia_damping; /* 0..100: low = long coast, high = stops fast */
 };
 
 void knob_set_mode(const struct device *dev, enum knob_mode mode);
@@ -47,6 +48,10 @@ bool knob_get_encoder_report(const struct device *dev);
 void knob_set_encoder_ppr(const struct device *dev, int ppr);
 
 int knob_get_encoder_ppr(const struct device *dev);
+
+/* Per-layer INERTIA flywheel damping (0..100; low = long coast). Pushed to the
+ * active profile via update_params; only the inertia profile consumes it. */
+void knob_set_inertia_damping(const struct device *dev, float damping);
 
 void knob_set_position_limit(const struct device *dev, float min, float max);
 

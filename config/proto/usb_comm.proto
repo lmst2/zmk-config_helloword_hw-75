@@ -430,6 +430,7 @@ message KnobConfig
 		optional Mode mode = 4;
 		optional uint32 ppr = 5;
 		optional float torque_limit = 6;
+		optional uint32 inertia_damping = 7; // 0..100: low = long coast, high = stops fast
 	}
 }
 

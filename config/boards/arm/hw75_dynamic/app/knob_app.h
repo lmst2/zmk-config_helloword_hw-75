@@ -15,6 +15,7 @@ struct knob_pref {
 	enum knob_mode mode;
 	int ppr;
 	float torque_limit;
+	float inertia_damping; /* 0..100 INERTIA flywheel damping; low = long coast */
 };
 
 bool knob_app_get_demo(void);

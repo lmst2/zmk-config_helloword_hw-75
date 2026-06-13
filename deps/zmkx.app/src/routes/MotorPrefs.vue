@@ -36,6 +36,11 @@
               :marks="{ 0: '0', 3: '3' }"
               @update:value="(torqueLimit: number) => handleChanged({ ...pref, torqueLimit })" />
           </a-form-item>
+          <a-form-item :label="t('damping')" v-if="showDamping(pref.mode!)">
+            <a-slider :disabled="!pref.active" :value="pref.inertiaDamping" :min="0" :max="100"
+              :marks="{ 0: t('damping-low'), 100: t('damping-high') }"
+              @update:value="(inertiaDamping: number) => handleChanged({ ...pref, inertiaDamping })" />
+          </a-form-item>
         </a-form>
       </template>
     </a-col>
@@ -83,6 +88,10 @@ function showPpr(mode: UsbComm.KnobConfig.Mode) {
 function showTorqueLimit(mode: UsbComm.KnobConfig.Mode) {
   return mode != UsbComm.KnobConfig.Mode.DISABLE;
 }
+
+function showDamping(mode: UsbComm.KnobConfig.Mode) {
+  return mode == UsbComm.KnobConfig.Mode.INERTIA;
+}
 </script>
 
 <i18n lang="yaml">
@@ -97,6 +106,9 @@ zh-Hans:
   mode-switch: 开关
   steps: 步数
   torque: 力度
+  damping: 阻尼
+  damping-low: 久
+  damping-high: 快
 zh-Hant:
   demo-warns: 請先關閉測試模式以進行設定。
   customize: 自訂
@@ -108,6 +120,9 @@ zh-Hant:
   mode-switch: 開關
   steps: 步數
   torque: 扭力
+  damping: 阻尼
+  damping-low: 久
+  damping-high: 快
 en:
   demo-warns: Please disable test mode before making settings.
   customize: Customize
@@ -119,4 +134,7 @@ en:
   mode-switch: Switch
   steps: Steps
   torque: Torque
+  damping: Damping
+  damping-low: Long
+  damping-high: Fast
 </i18n>

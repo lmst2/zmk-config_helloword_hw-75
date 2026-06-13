@@ -89,6 +89,8 @@ static bool write_prefs(pb_ostream_t *stream, const pb_field_t *field, void *con
 		pref.has_ppr = true;
 		pref.torque_limit = prefs[i].torque_limit;
 		pref.has_torque_limit = true;
+		pref.inertia_damping = (uint32_t)prefs[i].inertia_damping;
+		pref.has_inertia_damping = true;
 
 		if (!pb_encode_submessage(stream, usb_comm_KnobConfig_Pref_fields, &pref)) {
 			return false;
@@ -174,6 +176,9 @@ static bool handle_knob_update_pref(const usb_comm_MessageH2D *h2d, usb_comm_Mes
 		if (req->has_torque_limit) {
 			next.torque_limit = req->torque_limit;
 		}
+		if (req->has_inertia_damping) {
+			next.inertia_damping = (float)req->inertia_damping;
+		}
 
 		knob_app_set_pref(req->layer_id, &next);
 	} else {
@@ -194,6 +199,8 @@ static bool handle_knob_update_pref(const usb_comm_MessageH2D *h2d, usb_comm_Mes
 		res->has_ppr = true;
 		res->torque_limit = pref->torque_limit;
 		res->has_torque_limit = true;
+		res->inertia_damping = (uint32_t)pref->inertia_damping;
+		res->has_inertia_damping = true;
 	}
 
 	return true;

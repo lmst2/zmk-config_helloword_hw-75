@@ -46,6 +46,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 		.mode = DT_REG_ADDR(LAYER_PROFILE(node)),                                          \
 		.ppr = DT_PROP(node, ppr),                                                         \
 		.torque_limit = (float)DT_PROP(LAYER_PROFILE(node), torque_limit_mv) / 1000.0f,    \
+		.inertia_damping = 50.0f,                                                          \
 	},
 
 static const char *layer_names[KEYMAP_LAYERS_NUM] = { DT_FOREACH_CHILD(KEYMAP_NODE, LAYER_LABEL) };
@@ -380,6 +381,7 @@ static void knob_app_apply_pref(uint8_t layer_id)
 	}
 	knob_set_encoder_ppr(knob, pref->ppr);
 	motor_set_torque_limit(motor, pref->torque_limit);
+	knob_set_inertia_damping(knob, pref->inertia_damping);
 
 	knob_app_enable_report_delayed();
 

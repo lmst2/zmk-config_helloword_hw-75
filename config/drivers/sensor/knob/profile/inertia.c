@@ -76,6 +76,12 @@ static int knob_inertia_update_params(const struct device *dev, struct knob_para
 
 	data->encoder_rpp = PI2 / (float)params.ppr;
 
+	/* Map the 0..100 web "damping" to a per-tick decay: low damping = long
+	 * coast. 0 -> 0.9998 (~4 s), 50 -> 0.9994 (~1.3 s), 100 -> 0.9990 (~0.8 s). */
+	float d = params.inertia_damping;
+	d = d < 0.0f ? 0.0f : (d > 100.0f ? 100.0f : d);
+	data->decay = 0.9998f - (d / 100.0f) * 0.0008f;
+
 	return 0;
 }
 

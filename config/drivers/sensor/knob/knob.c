@@ -171,6 +171,17 @@ int knob_get_encoder_ppr(const struct device *dev)
 	return data->params.ppr;
 }
 
+void knob_set_inertia_damping(const struct device *dev, float damping)
+{
+	struct knob_data *data = dev->data;
+
+	data->params.inertia_damping = damping;
+
+	if (data->profile != NULL) {
+		knob_profile_update_params(data->profile, data->params);
+	}
+}
+
 void knob_set_position_limit(const struct device *dev, float min, float max)
 {
 	struct knob_data *data = dev->data;
@@ -378,6 +389,7 @@ int knob_init(const struct device *dev)
 	data->mc = motor_get_control(config->motor);
 
 	data->params.ppr = data->encoder_ppr;
+	data->params.inertia_damping = 50.0f; /* mid-range until a layer pref applies */
 
 	k_thread_create(&data->thread, data->thread_stack, CONFIG_KNOB_THREAD_STACK_SIZE,
 			(k_thread_entry_t)knob_thread, (void *)dev, 0, NULL,
