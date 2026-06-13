@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { createCanvas } from '@napi-rs/canvas';
 
 import { UsbComm } from './protoLoader.mjs';
 
@@ -9,140 +9,121 @@ import { UsbComm } from './protoLoader.mjs';
  * firmware renderer (eink_render.c) and the web (utils/graphic.ts::toBits) use:
  * row-major, pitch = width/8 = 16 bytes/row, MSB-first within each byte, bit
  * value 1 = white. We clear to white and draw black text, so the result is
- * black text on a white background — no inversion (matches what the device
- * already shows).
+ * black text on a white background — no inversion.
  *
- * renderNowPlaying() rasterizes a card with GDI+ (System.Drawing) via
- * PowerShell and returns the exact 4736-byte frame; EinkCard owns every write
- * to the panel so the live media overlay and the engine's per-app base mode
- * never fight over it.
+ * renderNowPlaying() rasterizes the card with @napi-rs/canvas (cross-platform,
+ * prebuilt for win/linux/mac x64+arm64) and returns the exact 4736-byte frame.
+ * Antialiasing is off so the output is pure black/white and the 1bpp packing is
+ * unambiguous. EinkCard owns every write to the panel so the live media overlay
+ * and the engine's per-app base mode never fight over it.
  */
 
 const EINK_WIDTH = 128;
 const EINK_HEIGHT = 296;
 const EINK_FRAME_BYTES = (EINK_WIDTH / 8) * EINK_HEIGHT; // 4736
 
-// Portrait 128x296 card. SingleBitPerPixelGridFit + SmoothingMode.None keep the
-// output pure black/white (no anti-aliased grays), so packing is unambiguous.
-const RENDER_SCRIPT = `
-$ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.Drawing
-Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @"
-using System;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
-public static class Hw75Eink {
-  public static string Pack(Bitmap bmp, int w, int h) {
-    var rect = new Rectangle(0, 0, w, h);
-    var data = bmp.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-    int stride = data.Stride;
-    byte[] src = new byte[stride * h];
-    Marshal.Copy(data.Scan0, src, 0, src.Length);
-    bmp.UnlockBits(data);
-    int rowBytes = w / 8;
-    byte[] outp = new byte[rowBytes * h];
-    for (int y = 0; y < h; y++) {
-      for (int x = 0; x < w; x++) {
-        int p = y * stride + x * 4;          // BGRA; pure b/w so any channel works
-        if (src[p + 2] > 127) {              // white pixel -> bit 1, MSB-first
-          outp[y * rowBytes + (x >> 3)] |= (byte)(0x80 >> (x & 7));
-        }
+// CJK uses whatever system font the host has (YaHei / PingFang / Noto), falling
+// back to sans-serif. Covers Chinese, Japanese kana, and Latin.
+const FONT_STACK =
+  '"Microsoft YaHei","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC",' +
+  '"Microsoft JhengHei","Source Han Sans SC",sans-serif';
+
+/* Greedy char-wrap into at most maxLines, ellipsizing the last on overflow. */
+function wrapText(ctx, text, maxWidth, maxLines) {
+  const chars = [...String(text || '')];
+  const lines = [];
+  let line = '';
+  for (const ch of chars) {
+    const test = line + ch;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = ch;
+      if (lines.length === maxLines) {
+        break;
       }
+    } else {
+      line = test;
     }
-    return Convert.ToBase64String(outp);
   }
+  if (lines.length < maxLines && line) {
+    lines.push(line);
+  }
+  if (lines.join('').length < chars.length && lines.length) {
+    let last = lines[lines.length - 1];
+    while (last && ctx.measureText(last + '…').width > maxWidth) {
+      last = last.slice(0, -1);
+    }
+    lines[lines.length - 1] = last + '…';
+  }
+  return lines;
 }
-"@
-
-$spec = $env:HW75_EINK_SPEC | ConvertFrom-Json
-$W = 128; $H = 296
-$bmp = New-Object System.Drawing.Bitmap($W, $H)
-$g = [System.Drawing.Graphics]::FromImage($bmp)
-$g.Clear([System.Drawing.Color]::White)
-$g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::SingleBitPerPixelGridFit
-$g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::None
-
-$black = [System.Drawing.Brushes]::Black
-$pen = New-Object System.Drawing.Pen([System.Drawing.Color]::Black, 2)
-
-$fApp = New-Object System.Drawing.Font('Microsoft YaHei', 10, [System.Drawing.FontStyle]::Bold)
-$fTitle = New-Object System.Drawing.Font('Microsoft YaHei', 14, [System.Drawing.FontStyle]::Bold)
-$fSub = New-Object System.Drawing.Font('Microsoft YaHei', 10)
-$fFoot = New-Object System.Drawing.Font('Consolas', 11)
-
-$sfC = New-Object System.Drawing.StringFormat
-$sfC.Alignment = [System.Drawing.StringAlignment]::Center
-$sfTitle = New-Object System.Drawing.StringFormat
-$sfTitle.Alignment = [System.Drawing.StringAlignment]::Center
-$sfTitle.LineAlignment = [System.Drawing.StringAlignment]::Center
-$sfTitle.Trimming = [System.Drawing.StringTrimming]::EllipsisCharacter
-
-# Header: source app, with a divider beneath (mirrors eink_render.c's dividers)
-$g.DrawString([string]$spec.app, $fApp, $black, (New-Object System.Drawing.RectangleF(4, 6, 120, 20)), $sfC)
-$g.DrawLine($pen, 8, 30, 119, 30)
-
-# Play/pause glyph (drawn from primitives, no font-glyph dependency) + status,
-# centered as a group via MeasureString so CJK text never clips.
-$statusText = if ($spec.playing) { '正在播放' } else { '已暂停' }
-$sz = $g.MeasureString($statusText, $fSub)
-$ty = 40
-$tx = [int](($W - $sz.Width) / 2) + 9
-$g.DrawString($statusText, $fSub, $black, [float]$tx, [float]$ty)
-$gx = $tx - 19
-if ($spec.playing) {
-  $tri = New-Object 'System.Drawing.PointF[]' 3
-  $tri[0] = New-Object System.Drawing.PointF($gx, ($ty + 3))
-  $tri[1] = New-Object System.Drawing.PointF($gx, ($ty + 15))
-  $tri[2] = New-Object System.Drawing.PointF(($gx + 12), ($ty + 9))
-  $g.FillPolygon($black, $tri)
-} else {
-  $g.FillRectangle($black, $gx, ($ty + 3), 4, 12)
-  $g.FillRectangle($black, ($gx + 7), ($ty + 3), 4, 12)
-}
-
-# Title (wrapped + vertically centered in its box, ellipsis on overflow)
-$g.DrawString([string]$spec.title, $fTitle, $black, (New-Object System.Drawing.RectangleF(6, 74, 116, 92)), $sfTitle)
-
-# Artist
-$g.DrawString([string]$spec.artist, $fSub, $black, (New-Object System.Drawing.RectangleF(6, 176, 116, 44)), $sfC)
-
-# Footer: divider + wall-clock time
-$g.DrawLine($pen, 8, 250, 119, 250)
-$g.DrawString([string]$spec.time, $fFoot, $black, (New-Object System.Drawing.RectangleF(4, 258, 120, 20)), $sfC)
-
-$g.Dispose()
-$b64 = [Hw75Eink]::Pack($bmp, $W, $H)
-$bmp.Dispose()
-[Console]::Out.Write($b64)
-`;
 
 export function renderNowPlaying(spec) {
-  return new Promise((resolve, reject) => {
-    const child = spawn('powershell.exe', [
-      '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden',
-      '-EncodedCommand', Buffer.from(RENDER_SCRIPT, 'utf16le').toString('base64'),
-    ], { windowsHide: true, env: { ...process.env, HW75_EINK_SPEC: JSON.stringify(spec) } });
+  const canvas = createCanvas(EINK_WIDTH, EINK_HEIGHT);
+  const ctx = canvas.getContext('2d');
+  ctx.antialias = 'none';
+  ctx.textBaseline = 'middle';
 
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (c) => { stdout += c.toString('utf8'); });
-    child.stderr.on('data', (c) => { stderr += c.toString('utf8'); });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      const b64 = stdout.trim();
-      if (!b64) {
-        reject(new Error(stderr.trim() || `eink render failed (code ${code})`));
-        return;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, EINK_WIDTH, EINK_HEIGHT);
+  ctx.fillStyle = '#000000';
+
+  // Header (source app) + divider, mirroring eink_render.c's divider style.
+  ctx.textAlign = 'center';
+  ctx.font = `bold 13px ${FONT_STACK}`;
+  ctx.fillText(String(spec.app || ''), EINK_WIDTH / 2, 16);
+  ctx.fillRect(8, 29, EINK_WIDTH - 16, 3);
+
+  // Play/pause glyph (from primitives) + status, centered as a group.
+  ctx.font = `12px ${FONT_STACK}`;
+  const statusText = spec.playing ? '正在播放' : '已暂停';
+  const sw = ctx.measureText(statusText).width;
+  const tx = Math.round((EINK_WIDTH - sw) / 2) + 9;
+  ctx.textAlign = 'left';
+  ctx.fillText(statusText, tx, 49);
+  const gx = tx - 19;
+  if (spec.playing) {
+    ctx.beginPath();
+    ctx.moveTo(gx, 43);
+    ctx.lineTo(gx, 55);
+    ctx.lineTo(gx + 12, 49);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    ctx.fillRect(gx, 43, 4, 12);
+    ctx.fillRect(gx + 7, 43, 4, 12);
+  }
+
+  // Title (wrapped, up to 3 lines, vertically centered around y=120).
+  ctx.textAlign = 'center';
+  ctx.font = `bold 17px ${FONT_STACK}`;
+  const titleLines = wrapText(ctx, spec.title, EINK_WIDTH - 12, 3);
+  const titleStartY = 120 - ((titleLines.length - 1) * 24) / 2;
+  titleLines.forEach((ln, i) => ctx.fillText(ln, EINK_WIDTH / 2, titleStartY + i * 24));
+
+  // Artist (up to 2 lines).
+  ctx.font = `12px ${FONT_STACK}`;
+  const artistLines = wrapText(ctx, spec.artist, EINK_WIDTH - 12, 2);
+  artistLines.forEach((ln, i) => ctx.fillText(ln, EINK_WIDTH / 2, 196 + i * 16));
+
+  // Footer divider + wall-clock time.
+  ctx.fillRect(8, 250, EINK_WIDTH - 16, 3);
+  ctx.font = `13px ${FONT_STACK}`;
+  ctx.fillText(String(spec.time || ''), EINK_WIDTH / 2, 266);
+
+  // Pack to 1bpp (row-major, MSB-first, bit 1 = white) — matches eink_render.c
+  // and the web's toBits. Red channel suffices since the image is pure b/w.
+  const data = ctx.getImageData(0, 0, EINK_WIDTH, EINK_HEIGHT).data;
+  const rowBytes = EINK_WIDTH / 8;
+  const out = Buffer.alloc(rowBytes * EINK_HEIGHT);
+  for (let y = 0; y < EINK_HEIGHT; y++) {
+    for (let x = 0; x < EINK_WIDTH; x++) {
+      if (data[(y * EINK_WIDTH + x) * 4] > 127) {
+        out[y * rowBytes + (x >> 3)] |= 0x80 >> (x & 7);
       }
-      const buf = Buffer.from(b64, 'base64');
-      if (buf.length !== EINK_FRAME_BYTES) {
-        reject(new Error(`eink frame is ${buf.length}B, expected ${EINK_FRAME_BYTES}B`));
-        return;
-      }
-      resolve(buf);
-    });
-  });
+    }
+  }
+  return Promise.resolve(out);
 }
 
 const APP_LABELS = [
