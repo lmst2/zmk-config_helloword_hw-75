@@ -20,10 +20,11 @@ const KNOB_MODE = {
 };
 
 export class ContextEngine {
-  constructor({ dynamic, keyboardBoard, foreground }) {
+  constructor({ dynamic, keyboardBoard, foreground, eink }) {
     this.dynamic = dynamic;
     this.keyboardBoard = keyboardBoard;
     this.foreground = foreground;
+    this.eink = eink; // EinkCard coordinator (owns the panel); optional
     this.rules = [];
     this.appliedKey = undefined;
     this.enabled = true;
@@ -142,6 +143,13 @@ export class ContextEngine {
   }
 
   async applyEink(index) {
+    // The EinkCard owns the panel: it applies the base mode now, or remembers it
+    // and restores it when a live now-playing overlay ends. Fall back to a
+    // direct EINK_SET_ACTIVE if no coordinator was wired.
+    if (this.eink) {
+      this.eink.setBaseMode(index | 0);
+      return;
+    }
     try {
       await this.dynamic.send({
         action: UsbComm.Action.EINK_SET_ACTIVE,

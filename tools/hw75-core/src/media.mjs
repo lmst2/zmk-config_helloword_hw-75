@@ -26,7 +26,7 @@ $s = $mgr.GetCurrentSession()
 if ($s) {
   $p = Await ($s.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
   $pb = $s.GetPlaybackInfo()
-  ConvertTo-Json -Compress @{ title = [string]$p.Title; artist = [string]$p.Artist; status = [string]$pb.PlaybackStatus }
+  ConvertTo-Json -Compress @{ title = [string]$p.Title; artist = [string]$p.Artist; status = [string]$pb.PlaybackStatus; app = [string]$s.SourceAppUserModelId }
 } else {
   '{}'
 }
@@ -38,7 +38,7 @@ export class Media extends EventEmitter {
     this.intervalMs = intervalMs;
     this.timer = undefined;
     this.running = false;
-    this.current = { title: '', artist: '', status: '' };
+    this.current = { title: '', artist: '', status: '', app: '' };
   }
 
   start() {
@@ -70,7 +70,7 @@ export class Media extends EventEmitter {
     try {
       const info = await queryMedia();
       if (info && (info.title !== this.current.title || info.artist !== this.current.artist ||
-                   info.status !== this.current.status)) {
+                   info.status !== this.current.status || info.app !== this.current.app)) {
         this.current = info;
         this.emit('change', info);
       }
@@ -102,6 +102,7 @@ function queryMedia() {
           title: String(parsed.title || ''),
           artist: String(parsed.artist || ''),
           status: String(parsed.status || ''),
+          app: String(parsed.app || ''),
         });
       } catch {
         resolve(undefined);

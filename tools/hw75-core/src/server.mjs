@@ -15,6 +15,7 @@ import { ContextEngine } from './engine.mjs';
 import { DEFAULT_RULES } from './rules.mjs';
 import { Media } from './media.mjs';
 import { Slots } from './slots.mjs';
+import { EinkCard } from './eink.mjs';
 
 const HOST = '127.0.0.1';
 const PORT = 8755;
@@ -124,15 +125,21 @@ foreground.on('change', (info) => {
   console.log(`[foreground] ${info.process} :: ${info.title}`);
 });
 
-/* The per-application context engine: foreground app -> device scene. Sends knob
- * feel/detents + e-ink to the dynamic, RGB theme to the keyboard board. */
-const engine = new ContextEngine({ dynamic: keyboard, keyboardBoard, foreground });
-engine.setRules(DEFAULT_RULES);
-
 const media = new Media();
 media.on('change', (info) => {
   console.log(`[media] ${info.status}: ${info.title}${info.artist ? ' - ' + info.artist : ''}`);
 });
+
+/* The EinkCard owns every write to the dynamic module's e-ink panel: the
+ * engine's per-app base mode (EINK_SET_ACTIVE) plus the live now-playing
+ * overlay (EINK_SET_IMAGE) rendered from the current media session. */
+const einkCard = new EinkCard({ dynamic: keyboard, media });
+
+/* The per-application context engine: foreground app -> device scene. Sends knob
+ * feel/detents to the dynamic, RGB theme to the keyboard board, and the e-ink
+ * base mode through the EinkCard coordinator. */
+const engine = new ContextEngine({ dynamic: keyboard, keyboardBoard, foreground, eink: einkCard });
+engine.setRules(DEFAULT_RULES);
 
 /* Drain function-slot triggers from the keyboard board and run their helper
  * actions in-process, so they fire even with no web page open. */
@@ -226,6 +233,7 @@ server.listen(PORT, HOST, () => {
   engine.start();
   media.start();
   slots.start();
+  einkCard.start();
 });
 
 let restartScheduled = false;
