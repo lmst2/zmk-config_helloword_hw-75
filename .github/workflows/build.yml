@@ -59,6 +59,11 @@ jobs:
 
       - name: Prepare west
         run: |
+          # A loose cache restore-key can bring back a PARTIAL zephyr/ (e.g.
+          # missing scripts/), which makes `west update` treat it as present and
+          # skip re-fetching -> `zephyr/scripts/requirements.txt` not found. Drop
+          # an incomplete checkout so west re-clones it cleanly.
+          if [ ! -f zephyr/scripts/requirements.txt ]; then rm -rf zephyr; fi
           west init -l .
           west update
           west zephyr-export
