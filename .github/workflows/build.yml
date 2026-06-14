@@ -97,7 +97,7 @@ jobs:
       - name: Check keyboard SRAM watermark
         if: startsWith(matrix.board, 'hw75_keyboard')
         run: |
-          ram_line=$(grep -E '^\s*RAM:' build.log | tail -1)
+          ram_line=$(grep -E '^\s*S?RAM:' build.log | tail -1)
           if [ -z "$ram_line" ]; then
             echo "::error::Could not find the RAM usage line in build.log (build output format changed?)"
             exit 1
