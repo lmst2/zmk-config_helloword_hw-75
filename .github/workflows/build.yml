@@ -84,11 +84,13 @@ jobs:
 
       - name: West build
         run: |
-          set -o pipefail
           west build -s deps/zmk/app -b ${{ matrix.board }} -- \
             -DZMK_CONFIG=${GITHUB_WORKSPACE}/config \
             -DKEYMAP_FILE=${GITHUB_WORKSPACE}/config/${{ matrix.keymap }} \
-            | tee build.log
+            2>&1 | tee build.log
+          # The container's run steps use /bin/sh (no `set -o pipefail`), so the
+          # pipe to tee masks west's exit code — fail explicitly if no ELF built.
+          test -f build/zephyr/zmk.elf
         env:
           PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
