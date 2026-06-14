@@ -67,7 +67,15 @@ jobs:
           west init -l .
           west update
           west zephyr-export
-          python3 -m pip install --break-system-packages -r zephyr/scripts/requirements.txt
+          # The zmk-build-arm image already ships Zephyr's Python deps, so this
+          # is belt-and-suspenders. Some container/cache states leave zephyr/
+          # without scripts/requirements.txt; don't hard-fail on it — fall back
+          # to the image's preinstalled deps and let `west build` be the judge.
+          if [ -f zephyr/scripts/requirements.txt ]; then
+            python3 -m pip install --break-system-packages -r zephyr/scripts/requirements.txt
+          else
+            echo "::warning::zephyr/scripts/requirements.txt absent after west update; using the build image's preinstalled deps"
+          fi
           # Nanopb 0.4.x protoc plugin needs protobuf Python <5 (5.x removes RegisterExtension etc.)
           python3 -m pip install --break-system-packages --force-reinstall 'protobuf==4.25.3'
           # Fail loudly if anything pulled protobuf>=5 back in, instead of a cryptic nanopb RegisterExtension error.
