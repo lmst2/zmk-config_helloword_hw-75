@@ -8,7 +8,7 @@
     "prestart": "node scripts/gen-proto.mjs",
     "start": "node ./src/server.mjs",
     "bundle": "node scripts/gen-proto.mjs && esbuild src/server.mjs --bundle --platform=node --format=cjs --target=node18 --outfile=dist/hw75-core.cjs --external:node-hid --external:@napi-rs/canvas",
-    "package": "npm run bundle && pkg dist/hw75-core.cjs -c pkg.config.json"
+    "package": "npm run bundle && pkg dist/hw75-core.cjs -c pkg.config.json --public"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.0",
