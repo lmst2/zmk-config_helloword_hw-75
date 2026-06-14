@@ -9,6 +9,10 @@ name: Package 中枢 (hw75-core)
 on:
   workflow_dispatch: {}
   push:
+    branches:
+      # Temporary: build artifacts on this branch (no Release — that's gated to
+      # core-v* tags below). Remove once the binaries have been validated.
+      - migration/checkpoint-2026-06
     tags:
       - 'core-v*'
 
